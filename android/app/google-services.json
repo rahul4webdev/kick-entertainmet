@@ -1,0 +1,56 @@
+{
+  "project_info": {
+    "project_number": "605453648031",
+    "project_id": "kick-c86cd",
+    "storage_bucket": "kick-c86cd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:605453648031:android:36b399e9f7cfab301fa2aa",
+        "android_client_info": {
+          "package_name": "com.kick.entertainment"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "605453648031-88u1i15h269ujn4vr9fif76o2au9aq45.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.kick.entertainment",
+            "certificate_hash": "0e51c6c7a055eca0dc2fc2d32b174b03097225e7"
+          }
+        },
+        {
+          "client_id": "605453648031-sf9m9jbq0n265ivlmn0auuhap2lgmfjc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAtnrVh9_BSqFC1p6nWiz1SSxRWhmYpjfE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "605453648031-sf9m9jbq0n265ivlmn0auuhap2lgmfjc.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "605453648031-76q2nkcd8skvm9mp7t5pv9f3o893dvam.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.kick.entertainment",
+                "app_store_id": "1663207881"
+              }
+            }
+          ]
+        }
+      },
+      "admob_app_id": "ca-app-pub-5563436569306667~9878713302"
+    }
+  ],
+  "configuration_version": "1"
+}

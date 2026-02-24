@@ -1,0 +1,52 @@
+# macOS
+.DS_Store
+*.swp
+
+# Flutter/Dart
+build/
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+pubspec.lock
+
+# Android
+android/.gradle/
+android/app/.gradle/
+android/app/build/
+android/app/.cxx/
+android/app/release/
+android/local.properties
+android/app/local.properties
+android/.kotlin/
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+
+# Secrets
+android/key.properties
+android/app/kick.jks
+android/app/*.keystore
+ios/Runner/*.mobileprovision
+*.p12
+*.pem
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Large files
+*.apk
+*.aab
+*.ipa
+
+# Backups
+.backup_*
+
+# Dev logs
+DEVELOPMENT_LOG.md
