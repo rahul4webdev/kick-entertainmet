@@ -24,6 +24,34 @@ class MessageScreenController extends BaseController {
   RxList<ChatThread> requestsUsers = <ChatThread>[].obs;
   final dashboardController = Get.find<DashboardScreenController>();
 
+  // Search filter for existing conversations
+  RxString searchQuery = ''.obs;
+  final TextEditingController searchTextController = TextEditingController();
+
+  List<ChatThread> get filteredChats {
+    if (searchQuery.value.isEmpty) return chatsUsers;
+    final q = searchQuery.value.toLowerCase();
+    return chatsUsers.where((thread) {
+      final username = thread.chatUser?.username?.toLowerCase() ?? '';
+      final fullname = thread.chatUser?.fullname?.toLowerCase() ?? '';
+      return username.contains(q) || fullname.contains(q);
+    }).toList();
+  }
+
+  List<ChatThread> get filteredRequests {
+    if (searchQuery.value.isEmpty) return requestsUsers;
+    final q = searchQuery.value.toLowerCase();
+    return requestsUsers.where((thread) {
+      final username = thread.chatUser?.username?.toLowerCase() ?? '';
+      final fullname = thread.chatUser?.fullname?.toLowerCase() ?? '';
+      return username.contains(q) || fullname.contains(q);
+    }).toList();
+  }
+
+  void onSearchChanged(String value) {
+    searchQuery.value = value;
+  }
+
   // Notes
   Rx<UserNote?> myNote = Rx<UserNote?>(null);
   RxList<UserNote> followerNotes = <UserNote>[].obs;

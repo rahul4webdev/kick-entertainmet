@@ -63,7 +63,7 @@ class ReelList extends StatelessWidget {
                             crossAxisCount: 3,
                             mainAxisSpacing: 1,
                             crossAxisSpacing: 1,
-                            mainAxisExtent: 172),
+                            childAspectRatio: 3 / 4),
                     itemBuilder: (context, index) {
                       Post post = reels[index];
                       return ReelGridCardView(
@@ -108,7 +108,7 @@ class ReelGridCardView extends StatelessWidget {
           alignment: AlignmentDirectional.bottomEnd,
           children: [
             CustomImage(
-                size: const Size(172, 172),
+                size: const Size(double.infinity, double.infinity),
                 strokeWidth: 0,
                 image: post?.thumbnail?.addBaseURL(),
                 radius: 0,

@@ -93,7 +93,10 @@ class MessageScreen extends StatelessWidget {
             ),
           ),
         ),
-        const CustomSearchTextField(),
+        CustomSearchTextField(
+          controller: controller.searchTextController,
+          onChanged: controller.onSearchChanged,
+        ),
         const NotesListView(),
         Expanded(
           child: Obx(
@@ -124,18 +127,21 @@ class ChatsListView extends StatelessWidget {
   Widget build(BuildContext context) {
     final MessageScreenController controller = Get.find();
     return Obx(() {
+      // Trigger reactivity on both searchQuery and chatsUsers
+      controller.searchQuery.value;
+      final filtered = controller.filteredChats;
       return NoDataView(
         showShow: controller.chatsUsers.isEmpty,
         title: LKey.chatListEmptyTitle.tr,
         description: LKey.chatListEmptyDescription.tr,
         child: ListView.builder(
-          itemCount: controller.chatsUsers.length + 1,
+          itemCount: filtered.length + 1,
           padding: EdgeInsets.zero,
           itemBuilder: (context, index) {
             if (index == 0) {
               return const _AiAssistantCard();
             }
-            ChatThread chatConversation = controller.chatsUsers[index - 1];
+            ChatThread chatConversation = filtered[index - 1];
             chatConversation.bindChatUser();
             return ChatConversationUserCard(chatConversation: chatConversation);
           },
@@ -152,22 +158,24 @@ class RequestsListView extends StatelessWidget {
   Widget build(BuildContext context) {
     final MessageScreenController controller = Get.find();
 
-    return Obx(
-      () => NoDataView(
+    return Obx(() {
+      controller.searchQuery.value;
+      final filtered = controller.filteredRequests;
+      return NoDataView(
         showShow: controller.requestsUsers.isEmpty,
         title: LKey.chatRequestEmptyTitle.tr,
         description: LKey.chatRequestEmptyDescription.tr,
         child: ListView.builder(
-          itemCount: controller.requestsUsers.length,
+          itemCount: filtered.length,
           padding: EdgeInsets.zero,
           itemBuilder: (context, index) {
-            ChatThread chatConversation = controller.requestsUsers[index];
+            ChatThread chatConversation = filtered[index];
             chatConversation.bindChatUser();
             return ChatConversationUserCard(chatConversation: chatConversation);
           },
         ),
-      ),
-    );
+      );
+    });
   }
 }
 

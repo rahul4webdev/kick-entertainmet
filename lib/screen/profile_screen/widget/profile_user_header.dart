@@ -48,7 +48,7 @@ class ProfileUserHeader extends StatelessWidget {
                 controller: controller,
                 user: user,
                 stats: [
-                  StatItem(value: user?.totalPostLikesCount ?? 0, label: LKey.likes.tr),
+                  StatItem(value: controller.reels.length + controller.posts.length, label: LKey.posts.tr),
                   StatItem(value: user?.followerCount ?? 0, label: LKey.followers.tr),
                   StatItem(value: user?.followingCount ?? 0, label: LKey.following.tr),
                 ],
@@ -518,25 +518,28 @@ class UserButtonView extends StatelessWidget {
                 : RowButton(controller: controller, isMe: isMe, user: user),
           ),
           const SizedBox(width: 8),
-          if (isMe)
-            InkWell(
-              onTap: () {
-                ShareManager.shared.showCustomShareSheet(user: user, keys: ShareKeys.user);
-              },
-              child: Container(
-                  height: 45,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: ShapeDecoration(
-                    shape:
-                        SmoothRectangleBorder(borderRadius: SmoothBorderRadius(cornerRadius: 10, cornerSmoothing: 1)),
-                    color: bgGrey(context),
-                  ),
-                  child: Image.asset(isMe ? AssetRes.icShare1 : AssetRes.icMore, height: 21, width: 21)),
-            )
-          else
+          InkWell(
+            onTap: () {
+              ShareManager.shared.showCustomShareSheet(user: user, keys: ShareKeys.user);
+            },
+            child: Container(
+                height: 45,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: ShapeDecoration(
+                  shape:
+                      SmoothRectangleBorder(borderRadius: SmoothBorderRadius(cornerRadius: 10, cornerSmoothing: 1)),
+                  color: bgGrey(context),
+                ),
+                child: Image.asset(AssetRes.icShare1, height: 21, width: 21)),
+          ),
+          if (!isMe) ...[
+            const SizedBox(width: 8),
             Obx(
               () => CustomPopupMenuButton(
                   items: [
+                    MenuItem(LKey.shareProfile.tr, () {
+                      ShareManager.shared.showCustomShareSheet(user: user, keys: ShareKeys.user);
+                    }),
                     MenuItem(
                         user?.isFavorite == true
                             ? LKey.removeFromFavorites.tr
@@ -574,7 +577,8 @@ class UserButtonView extends StatelessWidget {
                     ),
                     child: Image.asset(AssetRes.icMore, height: 21, width: 21),
                   )),
-            )
+            ),
+          ]
         ],
       ),
     );
@@ -666,17 +670,16 @@ class RowButton extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        if (isMe || user?.receiveMessage == 1)
-          Expanded(
-            child: TextButtonCustom(
-                onTap: () => controller.handlePublishOrMessageBtn(isMe),
-                title: isMe ? LKey.publish.tr : LKey.message.tr,
-                fontSize: 16,
-                backgroundColor: bgGrey(context),
-                titleColor: textLightGrey(context),
-                horizontalMargin: 0,
-                btnHeight: 45),
-          ),
+        Expanded(
+          child: TextButtonCustom(
+              onTap: () => controller.handlePublishOrMessageBtn(isMe),
+              title: isMe ? LKey.publish.tr : LKey.message.tr,
+              fontSize: 16,
+              backgroundColor: bgGrey(context),
+              titleColor: textLightGrey(context),
+              horizontalMargin: 0,
+              btnHeight: 45),
+        ),
         if (!isMe && user?.subscriptionsEnabled == true) ...[
           const SizedBox(width: 8),
           SizedBox(

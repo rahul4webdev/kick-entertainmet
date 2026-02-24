@@ -483,6 +483,20 @@ class ProfileScreenController extends BlockUserController
       Get.bottomSheet(PostOptionsSheet(controller: this),
           isScrollControlled: true);
     } else {
+      // Determine chat type based on receiveMessage setting (Instagram-style)
+      // receiveMessage: 1 = Everyone, 2 = Followers only, 0 = Nobody
+      // If I follow them AND they allow messages → approved, else → request
+      final receiveMsg = userData.value?.receiveMessage ?? 1;
+      final iFollow = userData.value?.isFollowing == true;
+      ChatType chatType;
+      if (receiveMsg == 1 && iFollow) {
+        chatType = ChatType.approved;
+      } else if (receiveMsg == 2 && iFollow) {
+        chatType = ChatType.approved;
+      } else {
+        chatType = ChatType.request;
+      }
+
       ChatThread conversation = ChatThread(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           lastMsg: '',
@@ -491,8 +505,10 @@ class ProfileScreenController extends BlockUserController
           deletedId: 0,
           iAmBlocked: false,
           iBlocked: userData.value?.isBlock ?? false,
-          requestType: UserRequestAction.accept.title,
-          chatType: ChatType.approved,
+          requestType: chatType == ChatType.approved
+              ? UserRequestAction.accept.title
+              : UserRequestAction.reject.title,
+          chatType: chatType,
           conversationId: [
             SessionManager.instance.getUserID(),
             userData.value?.id
