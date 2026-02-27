@@ -6,8 +6,9 @@ import 'package:shortzz/common/widget/custom_app_bar.dart';
 import 'package:shortzz/common/widget/custom_image.dart';
 import 'package:shortzz/common/widget/loader_widget.dart';
 import 'package:shortzz/common/widget/search_result_tile.dart';
-import 'package:shortzz/common/widget/text_button_custom.dart';
+import 'package:figma_squircle_updated/figma_squircle.dart';
 import 'package:shortzz/common/widget/user_list.dart';
+import 'package:shortzz/common/service/api/post_service.dart';
 import 'package:shortzz/common/service/api/product_service.dart';
 import 'package:shortzz/model/product/product_model.dart';
 import 'package:shortzz/languages/languages_keys.dart';
@@ -60,6 +61,9 @@ class CreateFeedScreen extends StatelessWidget {
               child: Stack(
                 children: [
                   SingleChildScrollView(
+                    padding: EdgeInsets.only(
+                      bottom: MediaQuery.of(context).padding.bottom + 20,
+                    ),
                     child: Column(
                       children: [
                         ReelPreviewCard(controller: controller),
@@ -87,11 +91,11 @@ class CreateFeedScreen extends StatelessWidget {
                         const FeedAiGeneratedToggle(),
                         _collaboratorRow(controller, context),
                         _productTagRow(controller, context),
+                        _seriesLinkRow(controller, context),
                         if (createType == CreateFeedType.reel)
                           _captionRow(controller, context),
                         _scheduleRow(controller, context),
-                        _uploadButton(controller, context),
-                        _saveAsDraftButton(controller, context),
+                        _actionButtons(controller, context),
                       ],
                     ),
                   ),
@@ -608,6 +612,289 @@ class CreateFeedScreen extends StatelessWidget {
     );
   }
 
+  Widget _seriesLinkRow(
+      CreateFeedScreenController controller, BuildContext context) {
+    return Obx(() {
+      final isOn = controller.isPartOfSeries.value;
+      final selected = controller.linkedPreviousPost.value;
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              children: [
+                Icon(Icons.link_rounded,
+                    size: 22, color: textDarkGrey(context)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    LKey.partOfSeries.tr,
+                    style: TextStyleCustom.outFitRegular400(
+                        fontSize: 14, color: whitePure(context)),
+                  ),
+                ),
+                SizedBox(
+                  height: 28,
+                  child: Switch.adaptive(
+                    value: isOn,
+                    onChanged: (val) {
+                      controller.isPartOfSeries.value = val;
+                      if (!val) {
+                        controller.linkedPreviousPost.value = null;
+                      }
+                    },
+                    activeColor: themeAccentSolid(context),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (isOn)
+            Padding(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+              child: InkWell(
+                onTap: () =>
+                    _showPreviousPartPicker(context, controller),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: bgMediumGrey(context),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      if (selected != null) ...[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.network(
+                            selected.thumbnail?.addBaseURL() ?? '',
+                            width: 40,
+                            height: 40,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 40,
+                              height: 40,
+                              color: bgLightGrey(context),
+                              child: const Icon(Icons.videocam_outlined,
+                                  size: 20),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                                CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                selected.description?.isNotEmpty == true
+                                    ? selected.description!
+                                    : LKey.previousPart.tr,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style:
+                                    TextStyleCustom.outFitMedium500(
+                                        fontSize: 13,
+                                        color: whitePure(context)),
+                              ),
+                              Text(
+                                'ID: ${selected.id}',
+                                style:
+                                    TextStyleCustom.outFitRegular400(
+                                        fontSize: 11,
+                                        color:
+                                            textLightGrey(context)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () => controller
+                              .linkedPreviousPost.value = null,
+                          child: Icon(Icons.close,
+                              size: 18,
+                              color: textLightGrey(context)),
+                        ),
+                      ] else ...[
+                        Icon(Icons.video_library_outlined,
+                            size: 20,
+                            color: themeAccentSolid(context)),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            LKey.selectPreviousPart.tr,
+                            style: TextStyleCustom.outFitRegular400(
+                                fontSize: 13,
+                                color: themeAccentSolid(context)),
+                          ),
+                        ),
+                        Icon(Icons.chevron_right,
+                            size: 20,
+                            color: textLightGrey(context)),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      );
+    });
+  }
+
+  void _showPreviousPartPicker(
+      BuildContext context, CreateFeedScreenController controller) {
+    final myPosts = <Post>[].obs;
+    final isLoading = true.obs;
+    int? lastItemId;
+    bool hasMore = true;
+
+    Future<void> loadPosts() async {
+      if (!hasMore) return;
+      isLoading.value = true;
+      try {
+        final userId = controller.myUser?.id;
+        final result = await PostService.instance.fetchUserPosts(
+          type: 'reel',
+          userId: userId,
+          lastItemId: lastItemId,
+        );
+        if (result != null && result.posts != null) {
+          myPosts.addAll(result.posts!);
+          if (result.posts!.isNotEmpty) {
+            lastItemId = result.posts!.last.id;
+          }
+          hasMore = result.posts!.length >= 20;
+        } else {
+          hasMore = false;
+        }
+      } catch (_) {}
+      isLoading.value = false;
+    }
+
+    loadPosts();
+
+    Get.bottomSheet(
+      Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: BoxDecoration(
+          color: scaffoldBackgroundColor(context),
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: textLightGrey(context),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              LKey.selectPreviousPart.tr,
+              style: TextStyleCustom.unboundedMedium500(
+                  fontSize: 16, color: textDarkGrey(context)),
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: Obx(() {
+                if (isLoading.value && myPosts.isEmpty) {
+                  return const Center(
+                      child: CircularProgressIndicator.adaptive());
+                }
+                if (myPosts.isEmpty) {
+                  return Center(
+                    child: Text(
+                      LKey.noPosts.tr,
+                      style: TextStyleCustom.outFitRegular400(
+                          fontSize: 14,
+                          color: textLightGrey(context)),
+                    ),
+                  );
+                }
+                return NotificationListener<ScrollNotification>(
+                  onNotification: (notification) {
+                    if (notification is ScrollEndNotification &&
+                        notification.metrics.extentAfter < 200 &&
+                        !isLoading.value &&
+                        hasMore) {
+                      loadPosts();
+                    }
+                    return false;
+                  },
+                  child: ListView.builder(
+                    itemCount: myPosts.length + (hasMore ? 1 : 0),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 4),
+                    itemBuilder: (context, index) {
+                      if (index >= myPosts.length) {
+                        return const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(
+                              child: CircularProgressIndicator
+                                  .adaptive()),
+                        );
+                      }
+                      final post = myPosts[index];
+                      return ListTile(
+                        leading: ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: Image.network(
+                            post.thumbnail?.addBaseURL() ?? '',
+                            width: 50,
+                            height: 50,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              width: 50,
+                              height: 50,
+                              color: bgMediumGrey(context),
+                              child: const Icon(
+                                  Icons.videocam_outlined,
+                                  size: 24),
+                            ),
+                          ),
+                        ),
+                        title: Text(
+                          post.description?.isNotEmpty == true
+                              ? post.description!
+                              : 'Reel #${post.id}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyleCustom.outFitMedium500(
+                              fontSize: 13,
+                              color: textDarkGrey(context)),
+                        ),
+                        subtitle: Text(
+                          post.createdAt ?? '',
+                          style: TextStyleCustom.outFitRegular400(
+                              fontSize: 11,
+                              color: textLightGrey(context)),
+                        ),
+                        trailing: Icon(Icons.add_circle_outline,
+                            color: themeAccentSolid(context)),
+                        onTap: () {
+                          controller.linkedPreviousPost.value = post;
+                          Get.back();
+                        },
+                      );
+                    },
+                  ),
+                );
+              }),
+            ),
+          ],
+        ),
+      ),
+      isScrollControlled: true,
+    );
+  }
+
   Widget _scheduleRow(
       CreateFeedScreenController controller, BuildContext context) {
     return Obx(() {
@@ -646,48 +933,92 @@ class CreateFeedScreen extends StatelessWidget {
     });
   }
 
-  Widget _uploadButton(
+  Widget _actionButtons(
       CreateFeedScreenController controller, BuildContext context) {
     return Obx(() {
-      RxBool isEmpty = (createType == CreateFeedType.feed &&
-              controller.commentHelper.isDetectableTextEmpty.value &&
-              controller.feedPostType.value == FeedPostType.text)
-          .obs;
+      final isEmpty = createType == CreateFeedType.feed &&
+          controller.commentHelper.isDetectableTextEmpty.value &&
+          controller.feedPostType.value == FeedPostType.text;
 
       final isScheduled = controller.scheduledAt.value != null;
-      return TextButtonCustom(
-        onTap: controller.handleUpload,
-        title: isScheduled ? LKey.schedulePost.tr : LKey.uploadNow.tr,
-        backgroundColor:
-            textDarkGrey(context).withValues(alpha: isEmpty.value ? .5 : 1),
-        titleColor:
-            whitePure(context).withValues(alpha: isEmpty.value ? .5 : 1),
-        margin: EdgeInsets.symmetric(
-            vertical: AppBar().preferredSize.height, horizontal: 20),
-      );
-    });
-  }
+      final double opacity = isEmpty ? 0.5 : 1.0;
 
-  Widget _saveAsDraftButton(
-      CreateFeedScreenController controller, BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: InkWell(
-        onTap: controller.saveAsDraft,
+      return Padding(
+        padding: const EdgeInsets.only(
+            top: 24, bottom: 8, left: 20, right: 20),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.save_outlined, size: 18, color: textLightGrey(context)),
-            const SizedBox(width: 6),
-            Text(
-              LKey.saveAsDraft.tr,
-              style: TextStyleCustom.outFitRegular400(
-                  fontSize: 14, color: textLightGrey(context)),
+            // Upload / Schedule button
+            Expanded(
+              child: InkWell(
+                onTap: controller.handleUpload,
+                borderRadius: SmoothBorderRadius(
+                    cornerRadius: 10, cornerSmoothing: 1),
+                child: Container(
+                  height: 50,
+                  alignment: Alignment.center,
+                  decoration: ShapeDecoration(
+                    shape: SmoothRectangleBorder(
+                      borderRadius: SmoothBorderRadius(
+                          cornerRadius: 10, cornerSmoothing: 1),
+                    ),
+                    color: textDarkGrey(context)
+                        .withValues(alpha: opacity),
+                  ),
+                  child: Text(
+                    (isScheduled
+                            ? LKey.schedulePost.tr
+                            : LKey.uploadNow.tr)
+                        .capitalize!,
+                    style: TextStyleCustom.outFitRegular400(
+                        color: whitePure(context)
+                            .withValues(alpha: opacity),
+                        fontSize: 15),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            // Save as Draft button
+            Expanded(
+              child: InkWell(
+                onTap: controller.saveAsDraft,
+                borderRadius: SmoothBorderRadius(
+                    cornerRadius: 10, cornerSmoothing: 1),
+                child: Container(
+                  height: 50,
+                  alignment: Alignment.center,
+                  decoration: ShapeDecoration(
+                    shape: SmoothRectangleBorder(
+                      borderRadius: SmoothBorderRadius(
+                          cornerRadius: 10, cornerSmoothing: 1),
+                      side: BorderSide(
+                        color: textDarkGrey(context)
+                            .withValues(alpha: 0.3),
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.save_outlined,
+                          size: 16, color: textDarkGrey(context)),
+                      const SizedBox(width: 6),
+                      Text(
+                        LKey.saveAsDraft.tr.capitalize!,
+                        style: TextStyleCustom.outFitRegular400(
+                            color: textDarkGrey(context),
+                            fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
         ),
-      ),
-    );
+      );
+    });
   }
 
   Widget mentionOrHashtagView(

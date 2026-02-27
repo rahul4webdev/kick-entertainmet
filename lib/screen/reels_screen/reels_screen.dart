@@ -9,7 +9,7 @@ import 'package:shortzz/model/post_story/feed_item.dart';
 import 'package:shortzz/model/post_story/post_model.dart';
 import 'package:shortzz/screen/comment_sheet/widget/hashtag_and_mention_view.dart';
 import 'package:shortzz/screen/reels_screen/reel/native_ad_reel_page.dart';
-import 'package:shortzz/screen/reels_screen/reel/vast_ad_reel_page.dart';
+import 'package:shortzz/screen/reels_screen/reel/ima_ad_reel_page.dart';
 import 'package:shortzz/screen/reels_screen/reel/reel_page.dart';
 import 'package:shortzz/screen/reels_screen/reels_screen_controller.dart';
 import 'package:shortzz/screen/reels_screen/widget/reels_text_field.dart';
@@ -105,10 +105,14 @@ class _ReelsScreenState extends State<ReelsScreen> {
                             if (feedItems != null && index < feedItems.length) {
                               final item = feedItems[index];
                               if (item is VastFeedAdItem) {
-                                return const VastAdReelPage();
+                                return const ImaAdReelPage();
                               }
                               if (item is NativeAdFeedItem) {
-                                return const NativeAdReelPage();
+                                // Native ads are for list view only — auto-skip in reel PageView
+                                return _SkipPage(
+                                  pageController: controller.pageController,
+                                  targetIndex: index + 1 < itemCount ? index + 1 : index - 1,
+                                );
                               }
                             }
                             final post = feedItems != null && index < feedItems.length
@@ -144,6 +148,33 @@ class _ReelsScreenState extends State<ReelsScreen> {
       ),
     );
   }
+}
+
+/// Transparent page that immediately jumps the PageView to [targetIndex].
+/// Used to skip non-video ad slots (e.g. NativeAdFeedItem) in the reel view.
+class _SkipPage extends StatefulWidget {
+  final PageController pageController;
+  final int targetIndex;
+
+  const _SkipPage({required this.pageController, required this.targetIndex});
+
+  @override
+  State<_SkipPage> createState() => _SkipPageState();
+}
+
+class _SkipPageState extends State<_SkipPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.pageController.hasClients) {
+        widget.pageController.jumpToPage(widget.targetIndex);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
 class CustomPageViewScrollPhysics extends ScrollPhysics {

@@ -68,9 +68,10 @@ class LoginScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 50 * 1.5),
                           LoginSheetTextField(
-                            hintText: LKey.enterYourEmail.tr,
+                            hintText: 'Email or Username',
                             controller: controller.emailController,
-                            keyboardType: TextInputType.emailAddress,
+                            keyboardType: TextInputType.text,
+                            autocorrect: false,
                           ),
                           const SizedBox(height: 14),
                           LoginSheetTextField(
@@ -182,13 +183,15 @@ class LoginSheetTextField extends StatefulWidget {
   final String hintText;
   final TextEditingController controller;
   final TextInputType? keyboardType;
+  final bool autocorrect;
 
   const LoginSheetTextField(
       {super.key,
       this.isPasswordField = false,
       required this.hintText,
       required this.controller,
-      this.keyboardType});
+      this.keyboardType,
+      this.autocorrect = true});
 
   @override
   State<LoginSheetTextField> createState() => _LoginSheetTextFieldState();
@@ -215,6 +218,7 @@ class _LoginSheetTextFieldState extends State<LoginSheetTextField> {
         onTapOutside: (event) => FocusManager.instance.primaryFocus?.unfocus(),
         obscureText: widget.isPasswordField && isHide,
         keyboardType: widget.keyboardType ?? TextInputType.text,
+        autocorrect: widget.autocorrect,
         decoration: InputDecoration(
           border: InputBorder.none,
           hintText: widget.hintText,

@@ -14,6 +14,7 @@ import 'package:shortzz/screen/chat_screen/message_type_widget/chat_gift_message
 import 'package:shortzz/screen/chat_screen/message_type_widget/chat_media_message.dart';
 import 'package:shortzz/screen/chat_screen/message_type_widget/chat_post_message.dart';
 import 'package:shortzz/screen/chat_screen/message_type_widget/chat_story_reply_message.dart';
+import 'package:shortzz/screen/chat_screen/message_type_widget/chat_call_log_message.dart';
 import 'package:shortzz/screen/chat_screen/message_type_widget/chat_text_message.dart';
 import 'package:shortzz/utilities/text_style_custom.dart';
 import 'package:shortzz/utilities/theme_res.dart';
@@ -162,6 +163,8 @@ class ChatMessageView extends StatelessWidget {
                                       isMe: isMe),
                                 MessageType.document =>
                                   ChatTextMessage(isMe: isMe, message: message),
+                                MessageType.callLog =>
+                                  ChatCallLogMessage(isMe: isMe, message: message),
                                 null => const SizedBox(),
                               },
                             ),

@@ -8,6 +8,7 @@ import 'package:shortzz/common/extensions/list_extension.dart';
 import 'package:shortzz/common/extensions/user_extension.dart';
 import 'package:shortzz/common/manager/logger.dart';
 import 'package:shortzz/common/manager/session_manager.dart';
+import 'package:shortzz/common/manager/share_manager.dart';
 import 'package:shortzz/common/service/api/highlight_service.dart';
 import 'package:shortzz/common/service/api/moderator_service.dart';
 import 'package:shortzz/common/service/api/post_service.dart';
@@ -83,13 +84,17 @@ class ProfileScreenController extends BlockUserController
     super.onClose();
   }
 
-  iniData() {
-    Future.wait({
-      fetchUserDetail(),
-      fetchReel(),
-      fetchPost(),
-      fetchHighlights(),
-    });
+  iniData() async {
+    try {
+      await Future.wait([
+        fetchUserDetail(),
+        fetchReel(),
+        fetchPost(),
+        fetchHighlights(),
+      ]);
+    } catch (e) {
+      Loggers.error('Profile iniData error: $e');
+    }
   }
 
   bool _exclusiveFetched = false;
@@ -109,14 +114,20 @@ class ProfileScreenController extends BlockUserController
 
   Future<void> fetchUserDetail() async {
     isLoading.value = true;
-    User? user = await UserService.instance
-        .fetchUserDetails(userId: userData.value?.id?.toInt());
-    profileController.updateUser(user);
-    isLoading.value = false;
-    if (user != null) {
-      userData.value = user;
-    } else {
+    try {
+      User? user = await UserService.instance
+          .fetchUserDetails(userId: userData.value?.id?.toInt());
+      profileController.updateUser(user);
+      if (user != null) {
+        userData.value = user;
+      } else {
+        isUserNotFound.value = true;
+      }
+    } catch (e) {
+      Loggers.error('Fetch user detail error: $e');
       isUserNotFound.value = true;
+    } finally {
+      isLoading.value = false;
     }
   }
 
@@ -150,28 +161,32 @@ class ProfileScreenController extends BlockUserController
   Future<void> fetchPost({bool isEmpty = false}) async {
     if (isPostLoading.value) return;
     isPostLoading.value = true;
-    // Fetch user posts
-    UserPostData? items = await PostService.instance.fetchUserPosts(
-      type: PostType.posts,
-      userId:
-          userData.value?.id?.toInt() ?? SessionManager.instance.getUserID(),
-      lastItemId: isEmpty ? null : posts.lastOrNull?.id?.toInt(),
-    );
+    try {
+      UserPostData? items = await PostService.instance.fetchUserPosts(
+        type: PostType.posts,
+        userId:
+            userData.value?.id?.toInt() ?? SessionManager.instance.getUserID(),
+        lastItemId: isEmpty ? null : posts.lastOrNull?.id?.toInt(),
+      );
 
-    if (isEmpty) {
-      posts.clear();
-    }
-    if (posts.isEmpty) {
-      posts.addAll(items?.pinnedPostList ?? []);
-    }
-
-    for (var post in (items?.posts ?? [])) {
-      if (posts.firstWhereOrNull((element) => element.id == post.id) == null) {
-        posts.add(post);
+      if (isEmpty) {
+        posts.clear();
       }
+      if (posts.isEmpty) {
+        posts.addAll(items?.pinnedPostList ?? []);
+      }
+
+      for (var post in (items?.posts ?? [])) {
+        if (posts.firstWhereOrNull((element) => element.id == post.id) == null) {
+          posts.add(post);
+        }
+      }
+      posts.refresh();
+    } catch (e) {
+      Loggers.error('Fetch post error: $e');
+    } finally {
+      isPostLoading.value = false;
     }
-    isPostLoading.value = false;
-    posts.refresh();
   }
 
   bool get hasExclusiveTab =>
@@ -219,12 +234,16 @@ class ProfileScreenController extends BlockUserController
   }
 
   Future<void> onRefresh() async {
-    Future.wait([
-      fetchUserDetail(),
-      fetchPost(isEmpty: true),
-      fetchReel(isEmpty: true),
-      fetchHighlights(),
-    ]);
+    try {
+      await Future.wait([
+        fetchUserDetail(),
+        fetchPost(isEmpty: true),
+        fetchReel(isEmpty: true),
+        fetchHighlights(),
+      ]);
+    } catch (e) {
+      Loggers.error('Profile refresh error: $e');
+    }
   }
 
   void onAddPost({Post? post, CreateFeedType? type}) {
@@ -483,20 +502,10 @@ class ProfileScreenController extends BlockUserController
       Get.bottomSheet(PostOptionsSheet(controller: this),
           isScrollControlled: true);
     } else {
-      // Determine chat type based on receiveMessage setting (Instagram-style)
-      // receiveMessage: 1 = Everyone, 2 = Followers only, 0 = Nobody
-      // If I follow them AND they allow messages → approved, else → request
-      final receiveMsg = userData.value?.receiveMessage ?? 1;
-      final iFollow = userData.value?.isFollowing == true;
-      ChatType chatType;
-      if (receiveMsg == 1 && iFollow) {
-        chatType = ChatType.approved;
-      } else if (receiveMsg == 2 && iFollow) {
-        chatType = ChatType.approved;
-      } else {
-        chatType = ChatType.request;
-      }
-
+      // Sender always sees approved chat (normal chat view).
+      // The backend (Node.js chatService.determineChatType) handles
+      // routing the message to the receiver's inbox or requests tab
+      // based on follow relationship and receiver's settings.
       ChatThread conversation = ChatThread(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           lastMsg: '',
@@ -505,10 +514,8 @@ class ProfileScreenController extends BlockUserController
           deletedId: 0,
           iAmBlocked: false,
           iBlocked: userData.value?.isBlock ?? false,
-          requestType: chatType == ChatType.approved
-              ? UserRequestAction.accept.title
-              : UserRequestAction.reject.title,
-          chatType: chatType,
+          requestType: UserRequestAction.accept.title,
+          chatType: ChatType.approved,
           conversationId: [
             SessionManager.instance.getUserID(),
             userData.value?.id
@@ -540,6 +547,11 @@ class ProfileScreenController extends BlockUserController
         });
       });
     }
+  }
+
+  void shareProfile() {
+    ShareManager.shared.showCustomShareSheet(
+        user: userData.value, keys: ShareKeys.user);
   }
 
   void freezeUnfreezeUser(bool isFreeze) async {

@@ -65,6 +65,11 @@ class WebService {
   static var live = _Live();
   static var grievance = _Grievance();
   static var appeal = _Appeal();
+  static var payment = _Payment();
+  static var returns = _Returns();
+  static var seller = _Seller();
+  static var affiliateApplication = _AffiliateApplication();
+  static var shootRequest = _ShootRequest();
 }
 
 class _Common {
@@ -320,6 +325,7 @@ class _Chat {
   static const _base = 'http://168.231.123.230:3002';
   String socketUrl = _base;
   String conversations = '$_base/api/chat/conversations';
+  String quickReply = '$_base/api/chat/quick-reply';
   String messages(String convId) => '$_base/api/chat/conversations/$convId/messages';
   String chatUser(int userId) => '$_base/api/chat/user/$userId';
   String broadcastMessages(int channelId) => '$_base/api/chat/broadcast/$channelId/messages';
@@ -792,4 +798,44 @@ class _Appeal {
   String submit = "${apiURL}appeal/submit";
   String list = "${apiURL}appeal/list";
   String detail = "${apiURL}appeal/detail";
+}
+
+class _Payment {
+  String checkoutSummary = "${apiURL}payment/checkoutSummary";
+  String initiateCheckout = "${apiURL}payment/initiateCheckout";
+  String verify = "${apiURL}payment/verify";
+  String gateways = "${apiURL}payment/gateways";
+  String sellerEarnings = "${apiURL}payment/sellerEarnings";
+  String trackOrder = "${apiURL}payment/trackOrder";
+  String shipOrder = "${apiURL}payment/shipOrder";
+  String markDelivered = "${apiURL}payment/markDelivered";
+  String cancelOrder = "${apiURL}payment/cancelOrder";
+}
+
+class _Returns {
+  String request = "${apiURL}returns/request";
+  String respond = "${apiURL}returns/respond";
+  String fetch = "${apiURL}returns/fetch";
+  String inspect = "${apiURL}returns/inspect";
+}
+
+class _Seller {
+  String submitApplication = "${apiURL}seller/submitApplication";
+  String fetchMyApplication = "${apiURL}seller/fetchMyApplication";
+  String updateBankDetails = "${apiURL}seller/updateBankDetails";
+  String updateBusinessAddress = "${apiURL}seller/updateBusinessAddress";
+}
+
+class _AffiliateApplication {
+  String submit = "${apiURL}affiliateApplication/submit";
+  String fetchMine = "${apiURL}affiliateApplication/fetchMine";
+}
+
+class _ShootRequest {
+  String create = "${apiURL}shootRequest/create";
+  String respond = "${apiURL}shootRequest/respond";
+  String sendMessage = "${apiURL}shootRequest/sendMessage";
+  String fetchMessages = "${apiURL}shootRequest/fetchMessages";
+  String fetchMyRequests = "${apiURL}shootRequest/fetchMyRequests";
+  String updateStatus = "${apiURL}shootRequest/updateStatus";
 }

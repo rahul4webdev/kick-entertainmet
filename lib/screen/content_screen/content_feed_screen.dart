@@ -9,6 +9,7 @@ import 'package:shortzz/screen/content_screen/widget/content_sub_tabs.dart';
 import 'package:shortzz/screen/content_screen/widget/content_reel_page.dart';
 import 'package:shortzz/screen/home_screen/home_screen_controller.dart';
 import 'package:shortzz/screen/reels_screen/reel/native_ad_reel_page.dart';
+import 'package:shortzz/screen/reels_screen/reel/ima_ad_reel_page.dart';
 import 'package:shortzz/screen/reels_screen/reels_screen.dart';
 import 'package:shortzz/utilities/theme_res.dart';
 
@@ -84,6 +85,9 @@ class _ContentFeedScreenState extends State<ContentFeedScreen> {
                       },
                       itemBuilder: (context, index) {
                         final item = feedItems[index];
+                        if (item is VastFeedAdItem) {
+                          return const ImaAdReelPage();
+                        }
                         if (item is NativeAdFeedItem) {
                           return const NativeAdReelPage();
                         }

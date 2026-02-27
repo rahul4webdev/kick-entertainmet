@@ -10,6 +10,7 @@ import 'package:shortzz/common/controller/follow_controller.dart';
 import 'package:shortzz/common/controller/profile_controller.dart';
 import 'package:shortzz/common/extensions/common_extension.dart';
 import 'package:shortzz/common/extensions/string_extension.dart';
+import 'package:shortzz/common/widget/custom_image.dart';
 import 'package:shortzz/common/manager/session_manager.dart';
 import 'package:shortzz/common/service/navigation/navigate_with_controller.dart';
 import 'package:shortzz/common/widget/full_name_with_blue_tick.dart';
@@ -200,6 +201,14 @@ class UserInfoHeader extends StatelessWidget {
     User? user = profileController.user;
     return Row(
       children: [
+        CustomImage(
+          image: user?.profilePhoto?.addBaseURL(),
+          fullName: user?.fullname,
+          size: const Size(34, 34),
+          strokeWidth: 1.5,
+          onTap: () => controller.onUserTap(user),
+        ),
+        const SizedBox(width: 8),
         Flexible(
           child: InkWell(
             onTap: () => controller.onUserTap(user),

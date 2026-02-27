@@ -28,7 +28,7 @@ class PlaylistService {
       param: {
         'name': name,
         if (description != null) 'description': description,
-        'is_public': isPublic,
+        'is_public': isPublic ? 1 : 0,
       },
     );
     if (response['status'] == true && response['data'] != null) {
@@ -50,7 +50,7 @@ class PlaylistService {
         'playlist_id': playlistId,
         if (name != null) 'name': name,
         if (description != null) 'description': description,
-        if (isPublic != null) 'is_public': isPublic,
+        if (isPublic != null) 'is_public': isPublic ? 1 : 0,
       },
     );
     return response;

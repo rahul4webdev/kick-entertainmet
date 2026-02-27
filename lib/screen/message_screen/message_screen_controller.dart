@@ -23,6 +23,7 @@ class MessageScreenController extends BaseController {
   RxList<ChatThread> chatsUsers = <ChatThread>[].obs;
   RxList<ChatThread> requestsUsers = <ChatThread>[].obs;
   final dashboardController = Get.find<DashboardScreenController>();
+  dynamic Function(dynamic)? _conversationUpdateHandler;
 
   // Search filter for existing conversations
   RxString searchQuery = ''.obs;
@@ -67,7 +68,7 @@ class MessageScreenController extends BaseController {
 
   @override
   void onClose() {
-    ChatSocketService.instance.off(ChatEvents.sConversationUpdate);
+    ChatSocketService.instance.off(ChatEvents.sConversationUpdate, _conversationUpdateHandler);
     super.onClose();
   }
 
@@ -93,13 +94,17 @@ class MessageScreenController extends BaseController {
   }
 
   void _listenToConversationUpdates() {
-    ChatSocketService.instance.on(ChatEvents.sConversationUpdate, (data) {
+    _conversationUpdateHandler = (dynamic data) {
       if (data is! Map) return;
       final thread = ChatThread.fromJson(Map<String, dynamic>.from(data));
 
-      // Remove from both lists
-      chatsUsers.removeWhere((u) => u.userId == thread.userId);
-      requestsUsers.removeWhere((u) => u.userId == thread.userId);
+      // Ignore events sent to us by mistake (stale Redis socket — server sends
+      // both user perspectives and this device receives both due to stale entry)
+      if (thread.userId == myUser?.id) return;
+
+      // Remove from both lists (match by conversationId for accuracy)
+      chatsUsers.removeWhere((u) => u.conversationId == thread.conversationId);
+      requestsUsers.removeWhere((u) => u.conversationId == thread.conversationId);
 
       // If deleted, don't re-add
       if (thread.isDeleted == true) {
@@ -116,7 +121,8 @@ class MessageScreenController extends BaseController {
       }
 
       _sortLists();
-    });
+    };
+    ChatSocketService.instance.on(ChatEvents.sConversationUpdate, _conversationUpdateHandler!);
   }
 
   void _sortLists() {

@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:shortzz/common/extensions/string_extension.dart';
 import 'package:shortzz/common/service/api/post_service.dart';
 import 'package:shortzz/common/widget/black_gradient_shadow.dart';
@@ -25,11 +27,11 @@ import 'package:shortzz/common/widget/video_linking_overlay.dart';
 import 'package:shortzz/common/widget/product_links_overlay.dart';
 import 'package:shortzz/common/widget/reel_product_overlay.dart';
 import 'package:shortzz/screen/reels_screen/reel/widget/caption_overlay.dart';
-import 'package:video_player/video_player.dart' hide Caption;
 import 'package:visibility_detector/visibility_detector.dart';
 
 // ---------------------------------------------------------------
-// REEL PAGE
+// REEL PAGE — uses media_kit (libmpv/ffmpeg) for reliable software
+// decoding on all Android chipsets including MediaTek Helio.
 // ---------------------------------------------------------------
 class ReelPage extends StatefulWidget {
   final Post reelData;
@@ -57,7 +59,10 @@ class ReelPage extends StatefulWidget {
 }
 
 class _ReelPageState extends State<ReelPage> {
-  VideoPlayerController? _controller;
+  static bool _mediaKitInitialized = false;
+
+  Player? _player;
+  VideoController? _videoController;
   bool _initialized = false;
   bool _isDisposed = false;
   bool isPlaying = true;
@@ -74,35 +79,41 @@ class _ReelPageState extends State<ReelPage> {
   bool _preRollDecisionPending = false;
   bool _hasTriggeredSmartPreload = false;
   int _lastPositionMs = 0; // Track position for backward-jump loop detection
+  int _initGeneration = 0; // Generation counter to cancel in-flight inits
+  StreamSubscription? _positionSub;
+  StreamSubscription? _completedSub;
+  int _videoDurationMs = 0;
+  int _videoWidth = 0;
+  int _videoHeight = 0;
 
   @override
   void initState() {
     super.initState();
-    // Pre-roll: do frequency check now, but defer min-video-length check
-    // until after video initializes (we don't know duration yet).
-    if (ImaAdManager.instance.shouldShowPreRoll()) {
-      debugPrint('[ReelPage] Pre-roll frequency matched for reel ${widget.reelData.id} — pending duration check');
-      _preRollDecisionPending = true;
-      _currentAdPlacement = ImaAdPlacement.preRoll;
-      _preloadVastAd(ImaAdPlacement.preRoll);
-    } else {
-      debugPrint('[ReelPage] Pre-roll NOT triggered (count not at frequency or disabled)');
+    // Pre-roll & video init: only for the current page (autoPlay=true)
+    // Other pages defer initialization until they become current.
+    if (widget.autoPlay) {
+      if (ImaAdManager.instance.shouldShowPreRoll()) {
+        debugPrint('[ReelPage] Pre-roll frequency matched for reel ${widget.reelData.id} — pending duration check');
+        _preRollDecisionPending = true;
+        _currentAdPlacement = ImaAdPlacement.preRoll;
+        _preloadVastAd(ImaAdPlacement.preRoll);
+      }
     }
 
     // Listen to page visibility changes (pause when bottom sheet opens)
     _visibilitySub = widget.reelsScreenController.isCurrentPageVisible.listen((visible) {
-      if (_isDisposed || !_initialized || _controller == null) return;
-      if (!visible && _controller!.value.isPlaying) {
-        _controller!.pause();
+      if (_isDisposed || !_initialized || _player == null) return;
+      if (!visible && (_player!.state.playing)) {
+        _player!.pause();
         isPlaying = false;
         if (mounted) setState(() {});
-      } else if (visible && !_controller!.value.isPlaying && isPlaying && !_showVastAd) {
-        _controller!.play();
+      } else if (visible && !(_player!.state.playing) && isPlaying && !_showVastAd) {
+        _player!.play();
         if (mounted) setState(() {});
       }
     });
 
-    // ✅ Setup Reel Controller
+    // Setup Reel Controller
     if (Get.isRegistered<ReelController>(tag: '${widget.reelData.id}')) {
       reelController = Get.find<ReelController>(tag: '${widget.reelData.id}');
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -121,26 +132,124 @@ class _ReelPageState extends State<ReelPage> {
       });
     }
 
-    _initializeAndPlayVideo();
+    // Only initialize video for the currently visible page
+    if (widget.autoPlay) {
+      _initializeAndPlayVideo();
+    }
+  }
+
+  @override
+  void didUpdateWidget(ReelPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!oldWidget.autoPlay && widget.autoPlay) {
+      // Page became current — initialize video if not already done
+      if (!_initialized && _player == null) {
+        if (ImaAdManager.instance.shouldShowPreRoll()) {
+          debugPrint('[ReelPage] Pre-roll frequency matched for reel ${widget.reelData.id} — pending duration check');
+          _preRollDecisionPending = true;
+          _currentAdPlacement = ImaAdPlacement.preRoll;
+          _preloadVastAd(ImaAdPlacement.preRoll);
+        }
+        _initializeAndPlayVideo();
+      } else if (_initialized && _player != null) {
+        _player!.play();
+        isPlaying = true;
+        if (mounted) setState(() {});
+      }
+    } else if (oldWidget.autoPlay && !widget.autoPlay) {
+      // Page is no longer current — dispose to free resources
+      _disposeVideoController();
+    }
   }
 
   Future<void> _initializeAndPlayVideo({int retryCount = 0}) async {
     if (_isDisposed) return;
+    final gen = ++_initGeneration;
+
+    // Lazy-init media_kit on first use (avoids ANR from loading
+    // libmpv + ffmpeg native libs during app startup)
+    if (!_mediaKitInitialized) {
+      MediaKit.ensureInitialized();
+      _mediaKitInitialized = true;
+    }
 
     try {
-      final url = Uri.parse(widget.reelData.video?.addBaseURL() ?? '');
-      _controller = VideoPlayerController.networkUrl(url);
+      // Dispose old player if any (prevents resource leak on retries)
+      if (_player != null) {
+        _positionSub?.cancel();
+        _positionSub = null;
+        _completedSub?.cancel();
+        _completedSub = null;
+        await _player!.dispose();
+        _player = null;
+        _videoController = null;
+        _initialized = false;
+      }
 
-      await _controller!.initialize();
+      final url = widget.reelData.video?.addBaseURL() ?? '';
+      debugPrint('[ReelPage] Initializing video for reel ${widget.reelData.id}: $url');
 
-      if (_isDisposed) return;
-      _controller!.setLooping(true);
-      _controller!.addListener(_onVideoPositionChanged);
+      // Create media_kit Player and VideoController.
+      // Force software decoding (hwdec: 'no') to avoid MediaTek hardware
+      // decoder failures, and skip the Utils.IsEmulator platform call.
+      _player = Player();
+      _videoController = VideoController(
+        _player!,
+        configuration: const VideoControllerConfiguration(
+          vo: 'gpu',
+          hwdec: 'no',
+          enableHardwareAcceleration: false,
+        ),
+      );
+
+      // Progressive delay before open — gives resources time to release
+      final delayMs = retryCount == 0 ? 100 : 500 * retryCount;
+      await Future.delayed(Duration(milliseconds: delayMs));
+      if (_isDisposed || gen != _initGeneration) {
+        _player?.dispose();
+        _player = null;
+        _videoController = null;
+        return;
+      }
+
+      // Open media without auto-play (we control play timing)
+      await _player!.open(Media(url), play: false);
+
+      // Wait for video to be ready (dimensions available)
+      final width = await _player!.stream.width.firstWhere((w) => w != null).timeout(
+        const Duration(seconds: 15),
+        onTimeout: () => null,
+      );
+
+      if (_isDisposed || gen != _initGeneration) {
+        _player?.dispose();
+        _player = null;
+        _videoController = null;
+        return;
+      }
+
+      if (width == null) {
+        throw Exception('Video failed to load — no dimensions received');
+      }
+
+      // Cache video dimensions and duration
+      _videoWidth = _player!.state.width ?? 1080;
+      _videoHeight = _player!.state.height ?? 1920;
+      _videoDurationMs = _player!.state.duration.inMilliseconds;
+
+      debugPrint('[ReelPage] Video ready: ${_videoWidth}x$_videoHeight, duration=${_videoDurationMs}ms');
+
+      // Set looping via playlist mode
+      await _player!.setPlaylistMode(PlaylistMode.single);
+
+      // Listen to position stream for seek bar, captions, and ad timing
+      _positionSub = _player!.stream.position.listen(_onVideoPositionChanged);
+
       _initialized = true;
 
       // After init, check if pre-roll should be cancelled due to min video length
       if (_preRollDecisionPending) {
-        final videoDurSec = _controller!.value.duration.inSeconds;
+        final videoDurSec = _videoDurationMs ~/ 1000;
         final minLength = SessionManager.instance.getSettings()?.imaPrerollMinVideoLength ?? 0;
         if (minLength > 0 && videoDurSec < minLength) {
           debugPrint('[ReelPage] Pre-roll cancelled: video ${videoDurSec}s < min ${minLength}s');
@@ -157,7 +266,7 @@ class _ReelPageState extends State<ReelPage> {
       if (dashboardController.selectedPageIndex.value != 0 && widget.isHomePage) {
         return;
       }
-      // ✅ Auto play only when visible and autoplay flag true
+      // Auto play only when visible and autoplay flag true
       if (widget.autoPlay && widget.reelsScreenController.isCurrentPageVisible.value) {
         // If pre-roll ad is loading/showing, don't auto-play yet
         if (_currentAdPlacement == ImaAdPlacement.preRoll) {
@@ -166,19 +275,35 @@ class _ReelPageState extends State<ReelPage> {
           }
           return;
         }
-        await _controller!.play();
+        await _player!.play();
         _increaseViewsCount(widget.reelData);
         isPlaying = true;
       }
 
       setState(() {});
     } catch (e) {
-      debugPrint('Video init error: $e');
+      debugPrint('[ReelPage] Video init error (retry $retryCount/3) for reel ${widget.reelData.id}: $e');
 
-      // 🔁 Retry if failed (max 3 retries with small delay)
-      if (retryCount < 3 && !_isDisposed) {
-        await Future.delayed(const Duration(milliseconds: 500));
-        _initializeAndPlayVideo(retryCount: retryCount + 1);
+      // Clean up failed player
+      _positionSub?.cancel();
+      _positionSub = null;
+      _completedSub?.cancel();
+      _completedSub = null;
+      _player?.dispose();
+      _player = null;
+      _videoController = null;
+      _initialized = false;
+
+      // Retry with exponential backoff (max 4 retries: 1s, 2s, 3s, 4s)
+      if (retryCount < 4 && !_isDisposed && gen == _initGeneration) {
+        final backoffMs = 1000 * (retryCount + 1);
+        debugPrint('[ReelPage] Retrying in ${backoffMs}ms...');
+        await Future.delayed(Duration(milliseconds: backoffMs));
+        if (!_isDisposed && gen == _initGeneration) {
+          _initializeAndPlayVideo(retryCount: retryCount + 1);
+        }
+      } else {
+        debugPrint('[ReelPage] All retries exhausted for reel ${widget.reelData.id}');
       }
     }
   }
@@ -186,44 +311,75 @@ class _ReelPageState extends State<ReelPage> {
   @override
   void dispose() {
     _isDisposed = true;
+    _initGeneration++; // Cancel any in-flight initialization
     _visibilitySub?.cancel();
-    _controller?.removeListener(_onVideoPositionChanged);
-    _controller?.dispose();
-    _controller = null;
+    _positionSub?.cancel();
+    _completedSub?.cancel();
+    _player?.dispose();
+    _player = null;
+    _videoController = null;
     _vastPreloader?.dispose();
     _vastPreloader = null;
     super.dispose();
   }
 
+  /// Dispose the video player to free resources.
+  /// Called when this page is no longer the current page.
+  void _disposeVideoController() {
+    _initGeneration++; // Cancel any in-flight initialization
+    _positionSub?.cancel();
+    _positionSub = null;
+    _completedSub?.cancel();
+    _completedSub = null;
+    _player?.dispose();
+    _player = null;
+    _videoController = null;
+    _initialized = false;
+    _vastPreloader?.dispose();
+    _vastPreloader = null;
+    _showVastAd = false;
+    _currentAdPlacement = null;
+    _preRollDecisionPending = false;
+    isPlaying = false;
+    _loopCount = 0;
+    _hasTriggeredSmartPreload = false;
+    _lastPositionMs = 0;
+    _videoDurationMs = 0;
+    if (mounted) setState(() {});
+  }
+
   void _handleVisibilityChanged(VisibilityInfo info) {
-    if (!_initialized || _controller == null || !_controller!.value.isInitialized) return;
+    if (!_initialized || _player == null) return;
 
     final isPageVisible = widget.reelsScreenController.isCurrentPageVisible.value;
 
     if ((info.visibleFraction * 100) > 90 && isPageVisible && !_showVastAd) {
-      if (!_controller!.value.isPlaying) {
-        _controller!.play();
+      if (!(_player!.state.playing)) {
+        _player!.play();
         isPlaying = true;
       }
     } else {
-      if (_controller!.value.isPlaying) {
-        _controller!.pause();
+      if (_player!.state.playing) {
+        _player!.pause();
         isPlaying = false;
       }
     }
     setState(() {});
   }
 
-  void _onVideoPositionChanged() {
-    if (_isDisposed || _controller == null || !_initialized) return;
+  void _onVideoPositionChanged(Duration position) {
+    if (_isDisposed || _player == null || !_initialized) return;
 
-    final value = _controller!.value;
-    if (value.duration.inMilliseconds <= 0) return;
+    if (_videoDurationMs <= 0) {
+      // Update cached duration if it wasn't available at init
+      _videoDurationMs = _player!.state.duration.inMilliseconds;
+      if (_videoDurationMs <= 0) return;
+    }
 
-    final posMs = value.position.inMilliseconds;
-    final durMs = value.duration.inMilliseconds;
+    final posMs = position.inMilliseconds;
+    final durMs = _videoDurationMs;
 
-    // Track position for product tag timing
+    // Track position for product tag timing and captions
     _videoPositionMs.value = posMs;
 
     if (_showVastAd || _currentAdPlacement != null) {
@@ -245,7 +401,7 @@ class _ReelPageState extends State<ReelPage> {
     }
 
     // Detect loop boundary: position jumps backward significantly.
-    // ExoPlayer with setLooping(true) seamlessly loops the video —
+    // media_kit with PlaylistMode.single seamlessly loops the video —
     // position goes from near-end back to near-start.
     if (_lastPositionMs > durMs - 1000 && posMs < 1000 && durMs > 1000) {
       debugPrint('[ReelPage] LOOP DETECTED: lastPos=${_lastPositionMs}ms pos=${posMs}ms dur=${durMs}ms loop=$_loopCount');
@@ -259,7 +415,7 @@ class _ReelPageState extends State<ReelPage> {
 
   /// Pre-load the next ad (mid-roll or post-roll) before the video ends.
   void _smartPreloadUpcomingAd() {
-    final videoDurSec = _controller?.value.duration.inSeconds ?? 0;
+    final videoDurSec = _videoDurationMs ~/ 1000;
     ImaAdPlacement? placement;
 
     if (_loopCount == 0) {
@@ -316,13 +472,13 @@ class _ReelPageState extends State<ReelPage> {
 
   void _onVideoLoopComplete() {
     _loopCount++;
-    final videoDurSec = _controller?.value.duration.inSeconds ?? 0;
+    final videoDurSec = _videoDurationMs ~/ 1000;
 
     if (_loopCount == 1) {
       // First loop completed — check mid-roll
       if (ImaAdManager.instance.shouldShowMidRoll(videoDurationSeconds: videoDurSec)) {
         _currentAdPlacement = ImaAdPlacement.midRoll;
-        _controller?.pause(); // Pause content video for ad
+        _player?.pause(); // Pause content video for ad
         isPlaying = false;
         if (_vastPreloader?.isReady == true) {
           debugPrint('[ReelPage] Using smart-preloaded mid-roll ad — instant!');
@@ -338,7 +494,7 @@ class _ReelPageState extends State<ReelPage> {
       // Subsequent loops — check post-roll
       if (ImaAdManager.instance.shouldShowPostRoll(videoDurationSeconds: videoDurSec)) {
         _currentAdPlacement = ImaAdPlacement.postRoll;
-        _controller?.pause(); // Pause content video for ad
+        _player?.pause(); // Pause content video for ad
         isPlaying = false;
         if (_vastPreloader?.isReady == true) {
           debugPrint('[ReelPage] Using smart-preloaded post-roll ad — instant!');
@@ -352,13 +508,13 @@ class _ReelPageState extends State<ReelPage> {
       }
     }
 
-    // No ad needed — video is already looping via setLooping(true)
+    // No ad needed — video is already looping via PlaylistMode.single
     _hasTriggeredSmartPreload = false;
   }
 
   void _onVastAdComplete() {
     debugPrint('[ReelPage] _onVastAdComplete called, loopCount=$_loopCount');
-    if (_isDisposed || _controller == null) return;
+    if (_isDisposed || _player == null) return;
     _showVastAd = false;
     _currentAdPlacement = null;
     _hasTriggeredSmartPreload = false;
@@ -368,12 +524,12 @@ class _ReelPageState extends State<ReelPage> {
 
     if (_loopCount == 0) {
       // Pre-roll finished — start playing for first time
-      _controller!.play();
+      _player!.play();
       _increaseViewsCount(widget.reelData);
       isPlaying = true;
     } else {
-      // Mid/post-roll finished — resume video (already looped to start via setLooping=true)
-      _controller!.play();
+      // Mid/post-roll finished — resume video
+      _player!.play();
       isPlaying = true;
     }
     if (mounted) setState(() {});
@@ -388,8 +544,7 @@ class _ReelPageState extends State<ReelPage> {
       debugPrint('[ReelPage] No ad tag for ${placement.name} — skipping');
       _currentAdPlacement = null;
       if (placement != ImaAdPlacement.preRoll) {
-        // Resume video (already looped to start via setLooping=true)
-        _controller?.play();
+        _player?.play();
         isPlaying = true;
         _hasTriggeredSmartPreload = false;
         if (mounted) setState(() {});
@@ -419,16 +574,15 @@ class _ReelPageState extends State<ReelPage> {
       if (placement == ImaAdPlacement.preRoll &&
           _loopCount == 0 &&
           _initialized &&
-          _controller != null &&
-          !_controller!.value.isPlaying) {
-        _controller!.play();
+          _player != null &&
+          !(_player!.state.playing)) {
+        _player!.play();
         _increaseViewsCount(widget.reelData);
         isPlaying = true;
         if (mounted) setState(() {});
       }
       if (placement != ImaAdPlacement.preRoll) {
-        // Resume video (already looped to start via setLooping=true)
-        _controller?.play();
+        _player?.play();
         isPlaying = true;
         _hasTriggeredSmartPreload = false;
         if (mounted) setState(() {});
@@ -437,12 +591,12 @@ class _ReelPageState extends State<ReelPage> {
   }
 
   void onPlayPause() {
-    if (_controller == null || !_controller!.value.isInitialized) return;
-    if (_controller!.value.isPlaying) {
-      _controller!.pause();
+    if (_player == null || !_initialized) return;
+    if (_player!.state.playing) {
+      _player!.pause();
       isPlaying = false;
     } else {
-      _controller!.play();
+      _player!.play();
       isPlaying = true;
     }
     setState(() {});
@@ -458,14 +612,23 @@ class _ReelPageState extends State<ReelPage> {
       child: Stack(
         alignment: Alignment.bottomCenter,
         children: [
-          /// 🎬 Directly play video (no thumbnail, no loader)
-          if (_controller != null) buildContent(),
+          /// Video content via media_kit
+          if (_videoController != null) buildContent(),
 
-          /// 🕹 Tap Overlay (pause/play)
+          /// Loading indicator while video initializes
+          if (_videoController == null && widget.autoPlay)
+            const Center(
+              child: CircularProgressIndicator(
+                color: Colors.white38,
+                strokeWidth: 2,
+              ),
+            ),
+
+          /// Tap Overlay (pause/play)
           InkWell(onTap: onPlayPause, child: const BlackGradientShadow()),
 
-          /// ▶ Play/Pause Icon overlay
-          if (_controller != null)
+          /// Play/Pause Icon overlay
+          if (_videoController != null)
             AnimatedOpacity(
               duration: const Duration(milliseconds: 150),
               opacity: isPlaying ? 0.0 : 1.0,
@@ -485,7 +648,7 @@ class _ReelPageState extends State<ReelPage> {
               ),
             ),
 
-          /// 💬 Video Reply to Comment badge
+          /// Video Reply to Comment badge
           if (widget.reelData.isVideoReply && _initialized && !_showVastAd)
             Positioned(
               top: MediaQuery.of(context).padding.top + 56,
@@ -518,15 +681,15 @@ class _ReelPageState extends State<ReelPage> {
               ),
             ),
 
-          /// 🔗 Video Linking: Previous/Next Part buttons
+          /// Video Linking: Previous/Next Part buttons
           if (_initialized && !_showVastAd)
             VideoLinkingOverlay(post: widget.reelData),
 
-          /// 🛒 Product Links overlay (external links)
+          /// Product Links overlay (external links)
           if (_initialized && !_showVastAd)
             ProductLinksOverlay(post: widget.reelData),
 
-          /// 🛒 Enhanced product tags overlay (positioned + timed)
+          /// Enhanced product tags overlay (positioned + timed)
           if (_initialized && !_showVastAd && widget.reelData.productTags != null && widget.reelData.productTags!.isNotEmpty)
             ValueListenableBuilder<int>(
               valueListenable: _videoPositionMs,
@@ -536,16 +699,16 @@ class _ReelPageState extends State<ReelPage> {
               ),
             ),
 
-          /// 📝 Captions overlay
+          /// Captions overlay
           if (_initialized &&
               !_showVastAd &&
-              _controller != null &&
+              _player != null &&
               widget.reelData.hasCaptions &&
               widget.reelData.captions != null &&
               widget.reelData.captions!.isNotEmpty &&
               _showCaptions)
             CaptionOverlay(
-              controller: _controller!,
+              videoPositionMs: _videoPositionMs,
               captions: widget.reelData.captions!,
             ),
 
@@ -593,22 +756,21 @@ class _ReelPageState extends State<ReelPage> {
               ),
             ),
 
-          /// 📺 VAST Ad Overlay (pre-roll, mid-roll, or post-roll)
-          /// Uses the app's own video player — no platform views, instant playback.
+          /// VAST Ad Overlay (pre-roll, mid-roll, or post-roll)
           if (_showVastAd && _initialized && _vastPreloader != null)
             VastAdOverlay(
               preloader: _vastPreloader!,
               onAdComplete: _onVastAdComplete,
             ),
 
-          /// ℹ️ Reel Info Section
+          /// Reel Info Section
           ReelInfoSection(
             controller: reelController,
             likeKey: widget.likeKey,
-            videoPlayerPlusController: _controller,
+            player: _player,
           ),
 
-          /// 💖 Like Animation
+          /// Like Animation
           Obx(() {
             if (details.value == null) return const SizedBox();
             return ReelAnimationLike(
@@ -629,7 +791,8 @@ class _ReelPageState extends State<ReelPage> {
   }
 
   Widget buildContent() {
-    Size size = _controller!.value.size;
+    final w = _videoWidth > 0 ? _videoWidth.toDouble() : 1080.0;
+    final h = _videoHeight > 0 ? _videoHeight.toDouble() : 1920.0;
     return VisibilityDetector(
       key: Key('reel_${widget.reelData.id}'),
       onVisibilityChanged: _handleVisibilityChanged,
@@ -638,11 +801,14 @@ class _ReelPageState extends State<ReelPage> {
         child: ClipRRect(
           child: SizedBox.expand(
             child: FittedBox(
-              fit: (size.width < size.height) ? BoxFit.cover : BoxFit.fitWidth,
+              fit: (w < h) ? BoxFit.cover : BoxFit.fitWidth,
               child: SizedBox(
-                width: size.width,
-                height: size.height,
-                child: VideoPlayer(_controller!),
+                width: w,
+                height: h,
+                child: Video(
+                  controller: _videoController!,
+                  controls: NoVideoControls,
+                ),
               ),
             ),
           ),
@@ -663,12 +829,12 @@ class _ReelPageState extends State<ReelPage> {
 class ReelInfoSection extends StatelessWidget {
   final ReelController controller;
   final GlobalKey likeKey;
-  final VideoPlayerController? videoPlayerPlusController;
+  final Player? player;
 
   const ReelInfoSection({super.key,
     required this.controller,
     required this.likeKey,
-    required this.videoPlayerPlusController});
+    required this.player});
 
   @override
   Widget build(BuildContext context) {
@@ -676,7 +842,7 @@ class ReelInfoSection extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         ReelInfoRow(controller: controller, likeKey: likeKey),
-        ReelSeekBar(videoController: videoPlayerPlusController, controller: controller),
+        ReelSeekBar(player: player, controller: controller),
       ],
     );
   }

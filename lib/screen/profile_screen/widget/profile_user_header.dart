@@ -5,20 +5,19 @@ import 'package:get/get.dart';
 import 'package:shortzz/common/extensions/common_extension.dart';
 import 'package:shortzz/common/extensions/string_extension.dart';
 import 'package:shortzz/common/manager/session_manager.dart';
-import 'package:shortzz/common/manager/share_manager.dart';
 import 'package:shortzz/common/widget/custom_image.dart';
-import 'package:shortzz/common/widget/custom_popup_menu_button.dart';
-import 'package:shortzz/common/widget/full_name_with_blue_tick.dart';
 import 'package:shortzz/common/widget/gradient_border.dart';
 import 'package:shortzz/common/widget/text_button_custom.dart';
 import 'package:shortzz/languages/languages_keys.dart';
 import 'package:shortzz/model/user_model/user_model.dart';
+import 'package:shortzz/screen/camera_screen/camera_screen.dart';
+import 'package:shortzz/screen/creator_dashboard_screen/creator_dashboard_screen.dart';
+import 'package:shortzz/screen/edit_profile_screen/edit_profile_screen.dart';
 import 'package:shortzz/screen/follow_following_screen/follow_following_screen.dart';
 import 'package:shortzz/screen/level_screen/level_screen.dart';
 import 'package:shortzz/screen/profile_screen/profile_screen_controller.dart';
 import 'package:shortzz/screen/profile_screen/widget/profile_preview_interactive_screen.dart';
 import 'package:shortzz/screen/profile_screen/widget/user_link_sheet.dart';
-import 'package:shortzz/screen/settings_screen/settings_screen.dart';
 import 'package:shortzz/screen/subscription_screen/creator_subscribe_sheet.dart';
 import 'package:shortzz/utilities/asset_res.dart';
 import 'package:shortzz/utilities/style_res.dart';
@@ -36,45 +35,40 @@ class ProfileUserHeader extends StatelessWidget {
       () {
         User? user = controller.userData.value;
         bool isUserNotFound = controller.isUserNotFound.value;
+        bool isMe = user?.id == SessionManager.instance.getUserID();
 
         return Padding(
-          padding: const EdgeInsets.only(left: 15.0, right: 15.0, top: 15),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            spacing: 5,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              ProfileStatsRow(
-                userNotFound: isUserNotFound,
-                controller: controller,
+              const SizedBox(height: 8),
+              // Centered stats row: Followers | Profile Pic | Following
+              _CenteredStatsRow(
                 user: user,
-                stats: [
-                  StatItem(value: controller.reels.length + controller.posts.length, label: LKey.posts.tr),
-                  StatItem(value: user?.followerCount ?? 0, label: LKey.followers.tr),
-                  StatItem(value: user?.followingCount ?? 0, label: LKey.following.tr),
-                ],
-                onTap: (value) {
-                  if (isUserNotFound) {
-                    return;
-                  }
-                  switch (value) {
-                    case 0:
-                      break;
-                    case 1:
-                      user?.checkIsBlocked(() {
-                        Get.to(() => FollowFollowingScreen(type: FollowFollowingType.follower, user: user));
-                      });
-                      break;
-                    case 2:
-                      user?.checkIsBlocked(() {
-                        Get.to(() => FollowFollowingScreen(type: FollowFollowingType.following, user: user));
-                      });
-                      break;
-                  }
-                },
+                controller: controller,
+                userNotFound: isUserNotFound,
+                totalPosts: controller.reels.length + controller.posts.length,
               ),
-              if (!isUserNotFound) UserLinkView(user: user),
+              const SizedBox(height: 14),
+              // Name + Category row with pipe separator
+              if (!isUserNotFound)
+                _NameCategoryRow(
+                  user: user,
+                  totalPosts: controller.reels.length + controller.posts.length,
+                ),
+              const SizedBox(height: 4),
+              // Bio
               if (!isUserNotFound) UserBioView(user: user),
-              isUserNotFound ? const NoUserFoundButton() : UserButtonView(user: user, controller: controller)
+              // Links
+              if (!isUserNotFound) UserLinkView(user: user),
+              const SizedBox(height: 12),
+              // Action buttons
+              isUserNotFound
+                  ? const NoUserFoundButton()
+                  : _ActionButtonsRow(
+                      user: user, controller: controller, isMe: isMe),
+              const SizedBox(height: 4),
             ],
           ),
         );
@@ -83,191 +77,341 @@ class ProfileUserHeader extends StatelessWidget {
   }
 }
 
-class ProfileStatsRow extends StatelessWidget {
+// ─── CENTERED STATS ROW: Followers | PIC | Following ───
+class _CenteredStatsRow extends StatelessWidget {
   final User? user;
-  final List<StatItem> stats;
-  final Function(int value) onTap;
   final ProfileScreenController controller;
   final bool userNotFound;
+  final int totalPosts;
 
-  const ProfileStatsRow({
-    super.key,
+  const _CenteredStatsRow({
     required this.user,
-    required this.stats,
-    required this.onTap,
     required this.controller,
     required this.userNotFound,
+    required this.totalPosts,
   });
 
   @override
   Widget build(BuildContext context) {
     bool isStoryAvailable = (user?.stories ?? []).isNotEmpty;
-    GlobalKey previewKey = GlobalKey();
-    bool isWatch = isStoryAvailable && (user?.stories ?? []).every((element) => element.isWatchedByMe());
+    bool isWatch = isStoryAvailable &&
+        (user?.stories ?? []).every((element) => element.isWatchedByMe());
+    bool isMe = user?.id == SessionManager.instance.getUserID();
     RxBool isHeroEnable = false.obs;
+
     return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // Profile Picture
-        if (userNotFound)
-          Image.asset(AssetRes.icUserPlaceholder, width: 86, height: 86, fit: BoxFit.cover)
-        else
-          GestureDetector(
-            onTap: () => controller.onStoryTap(isStoryAvailable),
-            onLongPressStart: (details) {
-              isHeroEnable.value = true;
-            },
-            onLongPressEnd: (details) {
-              isHeroEnable.value = false;
-            },
-            onLongPress: () {
+        // Followers (left)
+        Expanded(
+          child: InkWell(
+            onTap: () {
+              if (userNotFound) return;
               user?.checkIsBlocked(() {
-                Navigator.push(
-                  context,
-                  PageRouteBuilder(
-                      opaque: false,
-                      barrierColor: Colors.transparent,
-                      transitionDuration: const Duration(milliseconds: 300),
-                      pageBuilder: (_, __, ___) => ProfilePreviewInteractiveScreen(user: user)),
-                );
+                Get.to(() => FollowFollowingScreen(
+                    type: FollowFollowingType.follower, user: user));
               });
             },
-            child: Container(
-              key: previewKey,
-              width: 86,
-              height: 86,
-              alignment: Alignment.center,
-              decoration: ShapeDecoration(
-                shape: SmoothRectangleBorder(
-                  borderRadius: SmoothBorderRadius(cornerRadius: 90),
+            child: Column(
+              children: [
+                Text(
+                  (user?.followerCount ?? 0).toInt().numberFormat,
+                  style: TextStyleCustom.unboundedSemiBold600(
+                    color: blackPure(context),
+                    fontSize: 17,
+                  ),
                 ),
-                gradient: isStoryAvailable
-                    ? (isWatch ? StyleRes.disabledGreyGradient(opacity: .5) : StyleRes.themeGradient)
-                    : null,
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(2.5),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: whitePure(context),
+                const SizedBox(height: 2),
+                Text(
+                  LKey.followers.tr.capitalize ?? '',
+                  style: TextStyleCustom.outFitRegular400(
+                    color: textLightGrey(context),
+                    fontSize: 13,
+                  ),
                 ),
-                child: Obx(
-                  () => HeroMode(
-                    enabled: isHeroEnable.value,
-                    child: Hero(
-                      tag: 'profile-${user?.id}',
-                      child: CustomImage(
-                        size: !isStoryAvailable ? const Size(86, 86) : const Size(76, 76),
-                        image: user?.isBlock == true ? '' : user?.profilePhoto?.addBaseURL(),
-                        fullName: user?.fullname,
+              ],
+            ),
+          ),
+        ),
+
+        // Profile Picture (center) with gradient ring and "+" badge
+        SizedBox(
+          width: 96,
+          height: 96,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              if (userNotFound)
+                Center(
+                  child: Image.asset(AssetRes.icUserPlaceholder,
+                      width: 90, height: 90, fit: BoxFit.cover),
+                )
+              else
+                Center(
+                  child: GestureDetector(
+                    onTap: () {
+                      // Show options: View Story (if available) + View Profile Picture
+                      if (isMe) {
+                        _showProfilePicOptions(context, user, isStoryAvailable, controller);
+                      } else {
+                        // For other users: tap opens story if available, else profile pic
+                        if (isStoryAvailable) {
+                          controller.onStoryTap(isStoryAvailable);
+                        } else {
+                          _openProfilePicPreview(context, user);
+                        }
+                      }
+                    },
+                    onLongPressStart: (_) => isHeroEnable.value = true,
+                    onLongPressEnd: (_) => isHeroEnable.value = false,
+                    onLongPress: () {
+                      user?.checkIsBlocked(() {
+                        _openProfilePicPreview(context, user);
+                      });
+                    },
+                    child: Container(
+                      width: 90,
+                      height: 90,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: isStoryAvailable
+                            ? (isWatch
+                                ? StyleRes.disabledGreyGradient(opacity: .5)
+                                : StyleRes.themeGradient)
+                            : null,
+                        border: !isStoryAvailable
+                            ? Border.all(
+                                color:
+                                    textLightGrey(context).withValues(alpha: .2),
+                                width: 2)
+                            : null,
+                      ),
+                      padding: const EdgeInsets.all(3),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: whitePure(context),
+                        ),
+                        padding: const EdgeInsets.all(2),
+                        child: Obx(
+                          () => HeroMode(
+                            enabled: isHeroEnable.value,
+                            child: Hero(
+                              tag: 'profile-${user?.id}',
+                              child: CustomImage(
+                                size: const Size(78, 78),
+                                image: user?.isBlock == true
+                                    ? ''
+                                    : user?.profilePhoto?.addBaseURL(),
+                                fullName: user?.fullname,
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
-          ),
-        const SizedBox(width: 16),
-        // Name + Stats (vertically centered with profile pic)
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Name row: fullname + level badge
-              if (!userNotFound) ...[
-                UserNameCompact(user: user),
-                const SizedBox(height: 10),
-              ],
-              // Stats row: likes | followers | following
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: List.generate(
-                  stats.length,
-                  (index) => Expanded(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        InkWell(
-                          onTap: () => onTap(index),
-                          child: StatColumn(value: stats[index].value, label: stats[index].label),
+              // "+" badge for adding story (own profile only)
+              if (isMe && !userNotFound)
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  left: 0,
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: () => Get.to(() => const CameraScreen(
+                          cameraType: CameraScreenType.story)),
+                      child: Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: StyleRes.themeGradient as LinearGradient,
+                          border: Border.all(color: whitePure(context), width: 2),
                         ),
-                        if (index != stats.length - 1) Container(height: 20, width: .5, color: textLightGrey(context)),
-                      ],
+                        child: const Icon(Icons.add, size: 14, color: Colors.white),
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
+          ),
+        ),
+
+        // Following (right)
+        Expanded(
+          child: InkWell(
+            onTap: () {
+              if (userNotFound) return;
+              user?.checkIsBlocked(() {
+                Get.to(() => FollowFollowingScreen(
+                    type: FollowFollowingType.following, user: user));
+              });
+            },
+            child: Column(
+              children: [
+                Text(
+                  (user?.followingCount ?? 0).toInt().numberFormat,
+                  style: TextStyleCustom.unboundedSemiBold600(
+                    color: blackPure(context),
+                    fontSize: 17,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  LKey.following.tr.capitalize ?? '',
+                  style: TextStyleCustom.outFitRegular400(
+                    color: textLightGrey(context),
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
+
+  void _openProfilePicPreview(BuildContext context, User? user) {
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.transparent,
+        transitionDuration: const Duration(milliseconds: 300),
+        pageBuilder: (_, __, ___) =>
+            ProfilePreviewInteractiveScreen(user: user),
+      ),
+    );
+  }
+
+  void _showProfilePicOptions(BuildContext context, User? user,
+      bool isStoryAvailable, ProfileScreenController controller) {
+    Get.bottomSheet(
+      Container(
+        decoration: BoxDecoration(
+          color: scaffoldBackgroundColor(context),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (isStoryAvailable)
+                ListTile(
+                  leading: Icon(Icons.play_circle_outline_rounded,
+                      color: themeAccentSolid(context)),
+                  title: Text(LKey.viewStory.tr,
+                      style: TextStyleCustom.outFitRegular400(fontSize: 16)),
+                  onTap: () {
+                    Get.back();
+                    controller.onStoryTap(true);
+                  },
+                ),
+              ListTile(
+                leading: Icon(Icons.account_circle_outlined,
+                    color: themeAccentSolid(context)),
+                title: Text(LKey.viewProfilePicture.tr,
+                    style: TextStyleCustom.outFitRegular400(fontSize: 16)),
+                onTap: () {
+                  Get.back();
+                  _openProfilePicPreview(context, user);
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.camera_alt_outlined,
+                    color: themeAccentSolid(context)),
+                title: Text(LKey.addStory.tr,
+                    style: TextStyleCustom.outFitRegular400(fontSize: 16)),
+                onTap: () {
+                  Get.back();
+                  Get.to(() => const CameraScreen(
+                      cameraType: CameraScreenType.story));
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-// Compact name view shown next to profile pic (above stats)
-class UserNameCompact extends StatelessWidget {
+// ─── NAME + CATEGORY ROW ───
+class _NameCategoryRow extends StatelessWidget {
   final User? user;
+  final int totalPosts;
 
-  const UserNameCompact({super.key, required this.user});
+  const _NameCategoryRow({required this.user, required this.totalPosts});
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Name row with verification and level
         Row(
-          children: [
-            Flexible(
-              child: Text(
-                user?.fullname ?? '',
-                style: TextStyleCustom.outFitSemiBold600(color: textDarkGrey(context), fontSize: 16),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            if (user?.pronouns != null && (user?.pronouns ?? '').isNotEmpty)
-              Text(
-                '  ${user?.pronouns ?? ''}',
-                style: TextStyleCustom.outFitLight300(color: textLightGrey(context).withValues(alpha: 0.6), fontSize: 13),
-              ),
-          ],
-        ),
-        const SizedBox(height: 2),
-        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             if (user?.isVerify == 1)
               Padding(
                 padding: const EdgeInsets.only(right: 4),
-                child: Image.asset(AssetRes.icBlueTick, width: 16, height: 16),
+                child:
+                    Image.asset(AssetRes.icBlueTick, width: 17, height: 17),
               ),
-            if (user?.getLevel.id != null)
+            Flexible(
+              child: Text(
+                user?.fullname ?? '',
+                style: TextStyleCustom.outFitSemiBold600(
+                    color: blackPure(context), fontSize: 17),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (user?.pronouns != null &&
+                (user?.pronouns ?? '').isNotEmpty)
+              Text(
+                '  ${user?.pronouns ?? ''}',
+                style: TextStyleCustom.outFitLight300(
+                    color: textLightGrey(context).withValues(alpha: 0.6),
+                    fontSize: 13),
+              ),
+            if (user?.getLevel.id != null) ...[
+              const SizedBox(width: 6),
               GestureDetector(
-                onTap: () => Get.to(() => LevelScreen(userLevels: user?.getLevel)),
+                onTap: () =>
+                    Get.to(() => LevelScreen(userLevels: user?.getLevel)),
                 child: GradientBorder(
                   strokeWidth: 1.2,
                   radius: 30,
                   gradient: StyleRes.themeGradient,
                   child: Container(
-                    height: 22,
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    height: 20,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
                     decoration: BoxDecoration(
-                        borderRadius: SmoothBorderRadius(cornerRadius: 30),
-                        color: themeAccentSolid(context).withValues(alpha: .1)),
+                      borderRadius: SmoothBorderRadius(cornerRadius: 30),
+                      color: themeAccentSolid(context).withValues(alpha: .1),
+                    ),
                     alignment: Alignment.center,
                     child: ShaderMask(
                       blendMode: BlendMode.srcIn,
-                      shaderCallback: (bounds) =>
-                          StyleRes.themeGradient.createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height)),
+                      shaderCallback: (bounds) => StyleRes.themeGradient
+                          .createShader(Rect.fromLTWH(
+                              0, 0, bounds.width, bounds.height)),
                       child: RichText(
                         text: TextSpan(
                           text: LKey.lvl.tr,
-                          style: TextStyleCustom.outFitLight300(fontSize: 12),
+                          style: TextStyleCustom.outFitLight300(fontSize: 11),
                           children: [
                             TextSpan(
-                                text: ' ${user?.getLevel.level ?? 0}',
-                                style: TextStyleCustom.outFitBold700(fontSize: 12))
+                              text: ' ${user?.getLevel.level ?? 0}',
+                              style:
+                                  TextStyleCustom.outFitBold700(fontSize: 11),
+                            ),
                           ],
                         ),
                       ),
@@ -275,157 +419,329 @@ class UserNameCompact extends StatelessWidget {
                   ),
                 ),
               ),
-            if (user?.profileCategory != null) ...[
-              const SizedBox(width: 6),
+            ],
+          ],
+        ),
+        const SizedBox(height: 3),
+        // Category | Posts count | Account type — centered row
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (user?.isPrivate == true)
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: Icon(Icons.lock_outline,
+                    size: 13, color: textLightGrey(context)),
+              ),
+            if (user?.profileCategory != null)
               Flexible(
                 child: Text(
                   user!.profileCategory!['name'] ?? '',
-                  style: TextStyleCustom.outFitLight300(color: textLightGrey(context), fontSize: 13),
+                  style: TextStyleCustom.outFitRegular400(
+                      color: textLightGrey(context), fontSize: 14),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ],
-            if (user?.isPrivate == true)
+            if (user?.profileCategory != null && totalPosts > 0)
               Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: Icon(Icons.lock_outline, size: 13, color: textLightGrey(context)),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text('|',
+                    style: TextStyleCustom.outFitLight300(
+                        color: textLightGrey(context).withValues(alpha: 0.4),
+                        fontSize: 14)),
               ),
+            if (totalPosts > 0)
+              Text(
+                '$totalPosts ${LKey.posts.tr}',
+                style: TextStyleCustom.outFitRegular400(
+                    color: textLightGrey(context), fontSize: 14),
+              ),
+            if (user?.accountType != null && (user?.accountType ?? 0) > 0) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text('|',
+                    style: TextStyleCustom.outFitLight300(
+                        color: textLightGrey(context).withValues(alpha: 0.4),
+                        fontSize: 14)),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: themeAccentSolid(context).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  _accountTypeLabel(user!.accountType!),
+                  style: TextStyleCustom.outFitMedium500(
+                      color: themeAccentSolid(context), fontSize: 11),
+                ),
+              ),
+            ],
           ],
         ),
       ],
     );
   }
+
+  String _accountTypeLabel(int type) {
+    switch (type) {
+      case 1:
+        return LKey.creatorLabel.tr;
+      case 2:
+        return LKey.businessText.tr;
+      case 3:
+        return LKey.productionHouse.tr;
+      case 4:
+        return LKey.newsMedia.tr;
+      default:
+        return '';
+    }
+  }
 }
 
-// Individual Stat Column Widget
-class StatColumn extends StatelessWidget {
-  final num value;
-  final String label;
-  final TextStyle? labelStyle;
-  final TextStyle? valueStyle;
+// ─── ACTION BUTTONS ROW ───
+class _ActionButtonsRow extends StatelessWidget {
+  final User? user;
+  final ProfileScreenController controller;
+  final bool isMe;
 
-  const StatColumn({super.key, required this.value, required this.label, this.labelStyle, this.valueStyle});
+  const _ActionButtonsRow({
+    required this.user,
+    required this.controller,
+    required this.isMe,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    if (user?.isBlock == true &&
+        user?.id != SessionManager.instance.getUserID()) {
+      return UnblockButton(onTap: () => controller.toggleBlockUnblock(true));
+    }
+
+    if (isMe) {
+      return _OwnProfileButtons(controller: controller);
+    }
+    return _OtherProfileButtons(user: user, controller: controller);
+  }
+}
+
+// ─── OWN PROFILE: Edit Profile | Statistics | Publish ───
+class _OwnProfileButtons extends StatelessWidget {
+  final ProfileScreenController controller;
+
+  const _OwnProfileButtons({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
       children: [
-        Text(
-          value.toInt().numberFormat,
-          style: valueStyle ??
-              TextStyleCustom.unboundedMedium500(
-                color: textDarkGrey(context),
-                fontSize: 15,
-              ),
+        // Edit Profile — outlined
+        Expanded(
+          child: _OutlinedButton(
+            title: LKey.editProfile.tr,
+            onTap: () {
+              Get.to(() => EditProfileScreen(
+                    onUpdateUser: controller.onUpdateUser,
+                  ));
+            },
+          ),
         ),
-        Text(label.capitalize ?? '',
-            style: labelStyle ??
-                TextStyleCustom.outFitLight300(
-                  color: textLightGrey(context),
-                  fontSize: 15,
-                )),
+        const SizedBox(width: 8),
+        // Statistics — outlined
+        Expanded(
+          child: _OutlinedButton(
+            title: LKey.statistics.tr,
+            onTap: () => Get.to(() => const CreatorDashboardScreen()),
+          ),
+        ),
+        const SizedBox(width: 8),
+        // Publish — filled accent
+        Expanded(
+          child: _FilledAccentButton(
+            title: LKey.publish.tr,
+            onTap: () => controller.handlePublishOrMessageBtn(true),
+          ),
+        ),
       ],
     );
   }
 }
 
-class UserNameView extends StatelessWidget {
+// ─── OTHER PROFILE: Follow | Message | Subscribe ───
+class _OtherProfileButtons extends StatelessWidget {
+  final User? user;
+  final ProfileScreenController controller;
+
+  const _OtherProfileButtons({required this.user, required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        // Follow/Unfollow
+        Expanded(
+          child: Obx(() {
+            bool isFollowProgress =
+                controller.isFollowUnFollowInProcess.value;
+            bool isFollowing = user?.isFollowing == true;
+            return isFollowing
+                ? _OutlinedButton(
+                    title: LKey.unFollow.tr,
+                    onTap: () {
+                      if (!isFollowProgress) {
+                        controller.followUnFollowUser();
+                      }
+                    },
+                    child: isFollowProgress
+                        ? CupertinoActivityIndicator(
+                            radius: 8, color: textLightGrey(context))
+                        : null,
+                  )
+                : _FilledAccentButton(
+                    title: LKey.follow.tr,
+                    onTap: () {
+                      if (!isFollowProgress) {
+                        controller.followUnFollowUser();
+                      }
+                    },
+                    child: isFollowProgress
+                        ? const CupertinoActivityIndicator(
+                            radius: 8, color: Colors.white)
+                        : null,
+                  );
+          }),
+        ),
+        const SizedBox(width: 8),
+        // Message
+        Expanded(
+          child: _OutlinedButton(
+            title: LKey.message.tr,
+            onTap: () => controller.handlePublishOrMessageBtn(false),
+          ),
+        ),
+        // Subscribe (if creator has subscriptions)
+        if (user?.subscriptionsEnabled == true) ...[
+          const SizedBox(width: 8),
+          Expanded(
+            child: _FilledAccentButton(
+              title: LKey.subscribe.tr,
+              onTap: () {
+                if (user != null) {
+                  Get.bottomSheet(
+                    CreatorSubscribeSheet(
+                      creator: user!,
+                      onSubscribed: () => controller.fetchUserDetail(),
+                    ),
+                    isScrollControlled: true,
+                  );
+                }
+              },
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// ─── OUTLINED BUTTON COMPONENT ───
+class _OutlinedButton extends StatelessWidget {
+  final String title;
+  final VoidCallback onTap;
+  final Widget? child;
+
+  const _OutlinedButton({
+    required this.title,
+    required this.onTap,
+    this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        height: 38,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+              color: textLightGrey(context).withValues(alpha: 0.3), width: 1),
+        ),
+        child: child ??
+            Text(
+              title,
+              style: TextStyleCustom.outFitMedium500(
+                  color: blackPure(context), fontSize: 14),
+            ),
+      ),
+    );
+  }
+}
+
+// ─── FILLED ACCENT BUTTON COMPONENT ───
+class _FilledAccentButton extends StatelessWidget {
+  final String title;
+  final VoidCallback onTap;
+  final Widget? child;
+
+  const _FilledAccentButton({
+    required this.title,
+    required this.onTap,
+    this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        height: 38,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(8),
+          color: blueFollow(context),
+        ),
+        child: child ??
+            Text(
+              title,
+              style: TextStyleCustom.outFitMedium500(
+                  color: Colors.white, fontSize: 14),
+            ),
+      ),
+    );
+  }
+}
+
+// ─── BIO VIEW ───
+class UserBioView extends StatelessWidget {
   final User? user;
 
-  const UserNameView({super.key, required this.user});
+  const UserBioView({super.key, required this.user});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        FullNameWithBlueTick(
-          username: user?.username,
-          style: TextStyleCustom.unboundedSemiBold600(color: textDarkGrey(context), fontSize: 17),
-          isVerify: user?.isVerify,
-          iconSize: 22,
-          child: user?.getLevel.id == null
-              ? const SizedBox()
-              : GradientBorder(
-                  onPressed: () {
-                    Get.to(() => LevelScreen(userLevels: user?.getLevel));
-                  },
-                  strokeWidth: 1.5,
-                  radius: 30,
-                  gradient: StyleRes.themeGradient,
-                  child: Container(
-                    height: 27,
-                    padding: const EdgeInsets.symmetric(horizontal: 15),
-                    decoration: BoxDecoration(
-                        borderRadius: SmoothBorderRadius(cornerRadius: 30),
-                        color: themeAccentSolid(context).withValues(alpha: .1)),
-                    alignment: Alignment.center,
-                    child: ShaderMask(
-                      blendMode: BlendMode.srcIn,
-                      shaderCallback: (bounds) =>
-                          StyleRes.themeGradient.createShader(Rect.fromLTWH(0, 0, bounds.width, bounds.height)),
-                      child: RichText(
-                        text: TextSpan(
-                          text: LKey.lvl.tr,
-                          style: TextStyleCustom.outFitLight300(fontSize: 15),
-                          children: [
-                            TextSpan(
-                                text: ' ${user?.getLevel.level ?? 0}',
-                                style: TextStyleCustom.outFitBold700(fontSize: 15))
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-        ),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(user?.fullname ?? '', style: TextStyleCustom.outFitLight300(color: textLightGrey(context), fontSize: 16)),
-            if (user?.pronouns != null && (user?.pronouns ?? '').isNotEmpty)
-              Text('  ${user?.pronouns ?? ''}', style: TextStyleCustom.outFitLight300(color: textLightGrey(context).withValues(alpha: 0.6), fontSize: 14)),
-          ],
-        ),
-        if (user?.profileCategory != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Row(
-              children: [
-                if (user?.isPrivate == true)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 4),
-                    child: Icon(Icons.lock_outline, size: 14, color: textLightGrey(context)),
-                  ),
-                Flexible(
-                  child: Text(
-                    user!.profileCategory!['name'] ?? '',
-                    style: TextStyleCustom.outFitLight300(color: textLightGrey(context), fontSize: 14),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        if (user?.profileCategory == null && user?.isPrivate == true)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Row(
-              children: [
-                Icon(Icons.lock_outline, size: 14, color: textLightGrey(context)),
-                const SizedBox(width: 4),
-                Text(
-                  LKey.privateAccount.tr,
-                  style: TextStyleCustom.outFitLight300(color: textLightGrey(context), fontSize: 14),
-                ),
-              ],
-            ),
-          ),
-      ],
+    if ((user?.bio ?? '').isEmpty) {
+      return const SizedBox();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Text(
+        user?.bio ?? '',
+        textAlign: TextAlign.center,
+        style: TextStyleCustom.outFitRegular400(
+            color: textDarkGrey(context), fontSize: 14),
+      ),
     );
   }
 }
 
+// ─── LINK VIEW ───
 class UserLinkView extends StatelessWidget {
   final User? user;
 
@@ -434,34 +750,41 @@ class UserLinkView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     List<Link> links = user?.links ?? [];
-    if (links.isNotEmpty) {
-      return InkWell(
+    if (links.isEmpty) return const SizedBox();
+    return Padding(
+      padding: const EdgeInsets.only(top: 4),
+      child: InkWell(
         onTap: () {
           user?.checkIsBlocked(() {
             if (links.length > 1) {
               Get.bottomSheet(UserLinkSheet(links: links),
-                  isScrollControlled: true, barrierColor: blackPure(context).withValues(alpha: .7));
+                  isScrollControlled: true,
+                  barrierColor: blackPure(context).withValues(alpha: .7));
             } else {
               (links.first.url ?? '').lunchUrlWithHttps;
             }
           });
         },
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(AssetRes.icLink, height: 20, width: 20, color: themeAccentSolid(context)),
-            const SizedBox(width: 3),
-            Expanded(
-              child: Text(shortUrl,
-                  style: TextStyleCustom.outFitRegular400(fontSize: 15, color: themeAccentSolid(context))),
-            )
+            Icon(Icons.link_rounded,
+                size: 16, color: themeAccentSolid(context)),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                shortUrl,
+                style: TextStyleCustom.outFitRegular400(
+                    fontSize: 13, color: themeAccentSolid(context)),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
           ],
         ),
-      );
-    } else {
-      return const SizedBox();
-    }
+      ),
+    );
   }
 
   String get shortUrl {
@@ -479,112 +802,7 @@ class UserLinkView extends StatelessWidget {
   }
 }
 
-class UserBioView extends StatelessWidget {
-  final User? user;
-
-  const UserBioView({super.key, required this.user});
-
-  @override
-  Widget build(BuildContext context) {
-    if ((user?.bio ?? '').isEmpty) {
-      return const SizedBox();
-    }
-    return Text(
-      user?.bio ?? '',
-      style: TextStyleCustom.outFitLight300(color: textLightGrey(context), fontSize: 16),
-    );
-  }
-}
-
-class UserButtonView extends StatelessWidget {
-  final User? user;
-  final ProfileScreenController controller;
-
-  const UserButtonView({super.key, required this.user, required this.controller});
-
-  @override
-  Widget build(BuildContext context) {
-    User? user = controller.profileController.user;
-
-    bool isMe = user?.id?.toInt() == SessionManager.instance.getUserID();
-    bool isBlock = (user?.isBlock == true && user?.id != SessionManager.instance.getUserID());
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20.0, top: 10),
-      child: Row(
-        children: [
-          Expanded(
-            child: isBlock
-                ? UnblockButton(onTap: () => controller.toggleBlockUnblock(true))
-                : RowButton(controller: controller, isMe: isMe, user: user),
-          ),
-          const SizedBox(width: 8),
-          InkWell(
-            onTap: () {
-              ShareManager.shared.showCustomShareSheet(user: user, keys: ShareKeys.user);
-            },
-            child: Container(
-                height: 45,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: ShapeDecoration(
-                  shape:
-                      SmoothRectangleBorder(borderRadius: SmoothBorderRadius(cornerRadius: 10, cornerSmoothing: 1)),
-                  color: bgGrey(context),
-                ),
-                child: Image.asset(AssetRes.icShare1, height: 21, width: 21)),
-          ),
-          if (!isMe) ...[
-            const SizedBox(width: 8),
-            Obx(
-              () => CustomPopupMenuButton(
-                  items: [
-                    MenuItem(LKey.shareProfile.tr, () {
-                      ShareManager.shared.showCustomShareSheet(user: user, keys: ShareKeys.user);
-                    }),
-                    MenuItem(
-                        user?.isFavorite == true
-                            ? LKey.removeFromFavorites.tr
-                            : LKey.addToFavorites.tr, () {
-                      controller.toggleFavorite(user?.isFavorite ?? false);
-                    }),
-                    MenuItem(
-                        user?.isMuted == true
-                            ? LKey.unmuteAccount.tr
-                            : LKey.muteAccount.tr, () {
-                      controller.toggleMuteUnmute(user?.isMuted ?? false);
-                    }),
-                    MenuItem(
-                        user?.isRestricted == true
-                            ? LKey.unrestrict.tr
-                            : LKey.restrict.tr, () {
-                      controller.toggleRestrictUnrestrict(
-                          user?.isRestricted ?? false);
-                    }),
-                    MenuItem(user?.isBlock == true ? LKey.unBlock.tr : LKey.block.tr, () {
-                      controller.toggleBlockUnblock(user?.isBlock ?? false);
-                    }),
-                    MenuItem(LKey.report.tr, () => controller.reportUser(user)),
-                    if (SessionManager.instance.isModerator.value == 1)
-                      MenuItem(user?.isFreez == 1 ? LKey.unFreeze.tr : LKey.freeze.tr,
-                          () => controller.freezeUnfreezeUser(user?.isFreez == 1))
-                  ],
-                  child: Container(
-                    height: 45,
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: ShapeDecoration(
-                      shape:
-                          SmoothRectangleBorder(borderRadius: SmoothBorderRadius(cornerRadius: 10, cornerSmoothing: 1)),
-                      color: bgGrey(context),
-                    ),
-                    child: Image.asset(AssetRes.icMore, height: 21, width: 21),
-                  )),
-            ),
-          ]
-        ],
-      ),
-    );
-  }
-}
-
+// ─── NO USER FOUND ───
 class NoUserFoundButton extends StatelessWidget {
   const NoUserFoundButton({super.key});
 
@@ -603,6 +821,7 @@ class NoUserFoundButton extends StatelessWidget {
   }
 }
 
+// ─── UNBLOCK BUTTON ───
 class UnblockButton extends StatelessWidget {
   final VoidCallback onTap;
 
@@ -617,104 +836,52 @@ class UnblockButton extends StatelessWidget {
       backgroundColor: blueFollow(context),
       titleColor: whitePure(context),
       horizontalMargin: 0,
-      btnHeight: 45,
+      btnHeight: 42,
     );
   }
 }
 
-class RowButton extends StatelessWidget {
-  final bool isMe;
-  final ProfileScreenController controller;
-  final User? user;
-
-  const RowButton({
-    super.key,
-    required this.isMe,
-    required this.controller,
-    this.user,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Obx(
-            () {
-              bool isFollowProgress = controller.isFollowUnFollowInProcess.value;
-              Color textColor = user?.isFollowing == true ? textLightGrey(context) : whitePure(context);
-              return TextButtonCustom(
-                onTap: () async {
-                  if (isMe) {
-                    Get.to(() => SettingsScreen(onUpdateUser: controller.onUpdateUser));
-                  } else {
-                    if (!isFollowProgress) {
-                      controller.followUnFollowUser();
-                    }
-                  }
-                },
-                title: isMe ? LKey.settings.tr : (user?.isFollowing == true ? LKey.unFollow.tr : LKey.follow.tr),
-                fontSize: 16,
-                backgroundColor:
-                    isMe ? bgGrey(context) : (user?.isFollowing == true ? bgGrey(context) : blueFollow(context)),
-                titleColor: isMe ? textLightGrey(context) : textColor,
-                horizontalMargin: 0,
-                btnHeight: 45,
-                child: isMe
-                    ? null
-                    : isFollowProgress
-                        ? CupertinoActivityIndicator(radius: 10, color: textColor)
-                        : null,
-              );
-            },
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: TextButtonCustom(
-              onTap: () => controller.handlePublishOrMessageBtn(isMe),
-              title: isMe ? LKey.publish.tr : LKey.message.tr,
-              fontSize: 16,
-              backgroundColor: bgGrey(context),
-              titleColor: textLightGrey(context),
-              horizontalMargin: 0,
-              btnHeight: 45),
-        ),
-        if (!isMe && user?.subscriptionsEnabled == true) ...[
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 45,
-            child: TextButtonCustom(
-              onTap: () {
-                if (user != null) {
-                  Get.bottomSheet(
-                    CreatorSubscribeSheet(
-                      creator: user!,
-                      onSubscribed: () => controller.fetchUserDetail(),
-                    ),
-                    isScrollControlled: true,
-                  );
-                }
-              },
-              title: '',
-              fontSize: 16,
-              backgroundColor: bgGrey(context),
-              titleColor: textLightGrey(context),
-              horizontalMargin: 0,
-              btnHeight: 45,
-              child: Image.asset(AssetRes.icCrown, width: 20, height: 20),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-// Stat Item Model
+// ─── STAT ITEM MODEL ───
 class StatItem {
   final num value;
   final String label;
 
   StatItem({required this.value, required this.label});
+}
+
+// ─── STAT COLUMN (kept for backward compatibility) ───
+class StatColumn extends StatelessWidget {
+  final num value;
+  final String label;
+  final TextStyle? labelStyle;
+  final TextStyle? valueStyle;
+
+  const StatColumn(
+      {super.key,
+      required this.value,
+      required this.label,
+      this.labelStyle,
+      this.valueStyle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          value.toInt().numberFormat,
+          style: valueStyle ??
+              TextStyleCustom.unboundedSemiBold600(
+                color: blackPure(context),
+                fontSize: 16,
+              ),
+        ),
+        Text(label.capitalize ?? '',
+            style: labelStyle ??
+                TextStyleCustom.outFitRegular400(
+                  color: textLightGrey(context),
+                  fontSize: 13,
+                )),
+      ],
+    );
+  }
 }

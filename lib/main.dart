@@ -17,7 +17,6 @@ import 'package:shortzz/common/widget/restart_widget.dart';
 import 'package:shortzz/languages/dynamic_translations.dart';
 import 'package:shortzz/screen/splash_screen/splash_screen.dart';
 import 'package:shortzz/utilities/theme_res.dart';
-
 import 'common/service/network_helper/network_helper.dart';
 
 @pragma('vm:entry-point')
@@ -50,6 +49,9 @@ Future<void> main() async {
 
     // Init Ads (ignore async wait if needed)
     MobileAds.instance.initialize();
+    MobileAds.instance.updateRequestConfiguration(
+      RequestConfiguration(testDeviceIds: ['3F06CCC183E028BF4F2A67D7B85C1D5D']),
+    );
 
     NetworkHelper().initialize();
 

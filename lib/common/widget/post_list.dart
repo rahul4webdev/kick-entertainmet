@@ -5,6 +5,7 @@ import 'package:shortzz/common/widget/loader_widget.dart';
 import 'package:shortzz/common/widget/no_data_widget.dart';
 import 'package:shortzz/languages/languages_keys.dart';
 import 'package:shortzz/common/widget/native_ad_card.dart';
+import 'package:shortzz/common/widget/ima_ad_card.dart';
 import 'package:shortzz/model/post_story/feed_item.dart';
 import 'package:shortzz/model/post_story/post_model.dart';
 import 'package:shortzz/screen/post_screen/post_card.dart';
@@ -58,7 +59,7 @@ class PostList extends StatelessWidget {
               return switch (item) {
                 PostFeedItem(:final post) => _buildPostCard(post),
                 NativeAdFeedItem() => const NativeAdCard(),
-                VastFeedAdItem() => const NativeAdCard(),
+                VastFeedAdItem() => const ImaAdCard(),
               };
             }
             return _buildPostCard(posts[index]);

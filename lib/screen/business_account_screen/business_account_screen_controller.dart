@@ -3,6 +3,8 @@ import 'package:get/get.dart';
 import 'package:shortzz/common/controller/base_controller.dart';
 import 'package:shortzz/common/manager/session_manager.dart';
 import 'package:shortzz/common/service/api/user_service.dart';
+import 'package:shortzz/common/widget/confirmation_dialog.dart';
+import 'package:shortzz/languages/languages_keys.dart';
 import 'package:shortzz/model/general/status_model.dart';
 import 'package:shortzz/model/user_model/profile_category_model.dart';
 
@@ -76,17 +78,28 @@ class BusinessAccountScreenController extends BaseController {
   }
 
   Future<void> revertToPersonal() async {
-    showLoader();
-    StatusModel result =
-        await UserService.instance.revertToPersonalAccount();
-    stopLoader();
-    if (result.status == true) {
-      await UserService.instance.fetchUserDetails();
-      showSnackBar(result.message);
-      Get.back(result: true);
-    } else {
-      showSnackBar(result.message);
-    }
+    Get.bottomSheet(
+      ConfirmationSheet(
+        title: LKey.revertToPersonal.tr,
+        description: LKey.revertToPersonalDesc.tr,
+        positiveText: LKey.switchToPersonal.tr,
+        onTap: () async {
+          Get.back();
+          showLoader();
+          StatusModel result =
+              await UserService.instance.revertToPersonalAccount();
+          stopLoader();
+          if (result.status == true) {
+            await UserService.instance.fetchUserDetails();
+            showSnackBar(result.message);
+            Get.back(result: true);
+          } else {
+            showSnackBar(result.message);
+          }
+        },
+      ),
+      isScrollControlled: true,
+    );
   }
 
   void nextStep() {

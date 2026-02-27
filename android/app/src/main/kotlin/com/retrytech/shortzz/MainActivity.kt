@@ -51,6 +51,8 @@ class MainActivity : FlutterActivity() {
         safeAdd(flutterEngine, "interactive_media_ads") { dev.flutter.packages.interactive_media_ads.InteractiveMediaAdsPlugin() }
         safeAdd(flutterEngine, "just_audio") { com.ryanheise.just_audio.JustAudioPlugin() }
         safeAdd(flutterEngine, "livekit_client") { io.livekit.plugin.LiveKitPlugin() }
+        safeAdd(flutterEngine, "media_kit_libs_android_video") { com.alexmercerind.media_kit_libs_android_video.MediaKitLibsAndroidVideoPlugin() }
+        safeAdd(flutterEngine, "media_kit_video") { com.alexmercerind.media_kit_video.MediaKitVideoPlugin() }
         safeAdd(flutterEngine, "mobile_scanner") { dev.steenbakker.mobile_scanner.MobileScannerPlugin() }
         safeAdd(flutterEngine, "package_info_plus") { dev.fluttercommunity.plus.packageinfo.PackageInfoPlugin() }
         safeAdd(flutterEngine, "path_provider_android") { io.flutter.plugins.pathprovider.PathProviderPlugin() }

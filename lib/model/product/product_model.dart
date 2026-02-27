@@ -40,6 +40,31 @@ class Product {
   String? name;
   String? description;
   int? priceCoins;
+  // Real money (INR) fields
+  int? pricePaise;
+  int? compareAtPricePaise;
+  int? shippingChargePaise;
+  double? priceRupees;
+  double? compareAtPriceRupees;
+  double? shippingChargeRupees;
+  double? gstRate;
+  String? hsnCode;
+  String? sku;
+  String? brandName;
+  int? weightGrams;
+  double? lengthCm;
+  double? breadthCm;
+  double? heightCm;
+  bool? hasVariants;
+  int? minOrderQty;
+  int? maxOrderQty;
+  String? shippingType; // self, platform, both
+  bool? codAvailable;
+  int? returnWindowDays;
+  bool? isReturnable;
+  String? pickupLocationName;
+  List<ProductVariant>? variants;
+
   List<String>? images;
   List<String>? imageUrls;
   int? stock;
@@ -66,6 +91,29 @@ class Product {
     this.name,
     this.description,
     this.priceCoins,
+    this.pricePaise,
+    this.compareAtPricePaise,
+    this.shippingChargePaise,
+    this.priceRupees,
+    this.compareAtPriceRupees,
+    this.shippingChargeRupees,
+    this.gstRate,
+    this.hsnCode,
+    this.sku,
+    this.brandName,
+    this.weightGrams,
+    this.lengthCm,
+    this.breadthCm,
+    this.heightCm,
+    this.hasVariants,
+    this.minOrderQty,
+    this.maxOrderQty,
+    this.shippingType,
+    this.codAvailable,
+    this.returnWindowDays,
+    this.isReturnable,
+    this.pickupLocationName,
+    this.variants,
     this.images,
     this.imageUrls,
     this.stock,
@@ -93,6 +141,35 @@ class Product {
     name = json['name'];
     description = json['description'];
     priceCoins = json['price_coins'];
+    // Real money fields
+    pricePaise = json['price_paise'];
+    compareAtPricePaise = json['compare_at_price_paise'];
+    shippingChargePaise = json['shipping_charge_paise'];
+    priceRupees = (json['price_rupees'] as num?)?.toDouble();
+    compareAtPriceRupees = (json['compare_at_price_rupees'] as num?)?.toDouble();
+    shippingChargeRupees = (json['shipping_charge_rupees'] as num?)?.toDouble();
+    gstRate = (json['gst_rate'] as num?)?.toDouble();
+    hsnCode = json['hsn_code'];
+    sku = json['sku'];
+    brandName = json['brand_name'];
+    weightGrams = json['weight_grams'];
+    lengthCm = (json['length_cm'] as num?)?.toDouble();
+    breadthCm = (json['breadth_cm'] as num?)?.toDouble();
+    heightCm = (json['height_cm'] as num?)?.toDouble();
+    hasVariants = json['has_variants'] == true;
+    minOrderQty = json['min_order_qty'];
+    maxOrderQty = json['max_order_qty'];
+    shippingType = json['shipping_type'];
+    codAvailable = json['cod_available'] == true;
+    returnWindowDays = json['return_window_days'];
+    isReturnable = json['is_returnable'] == true;
+    pickupLocationName = json['pickup_location_name'];
+    if (json['variants'] != null) {
+      variants = [];
+      json['variants'].forEach((v) {
+        variants!.add(ProductVariant.fromJson(v));
+      });
+    }
     if (json['images'] != null) {
       images = List<String>.from(json['images']);
     }
@@ -138,6 +215,31 @@ class Product {
   bool get isUnlimitedStock => stock == -1;
   bool get isInStock => stock == -1 || (stock != null && stock! > 0);
 
+  /// Get display price in rupees. Falls back to coins if no INR price.
+  double get displayPriceRupees => priceRupees ?? (pricePaise != null ? pricePaise! / 100.0 : 0);
+
+  /// Formatted price string (e.g., "₹999.00")
+  String get formattedPrice {
+    final rupees = displayPriceRupees;
+    if (rupees > 0) return '₹${rupees.toStringAsFixed(rupees.truncateToDouble() == rupees ? 0 : 2)}';
+    if (priceCoins != null && priceCoins! > 0) return '$priceCoins coins';
+    return 'Free';
+  }
+
+  /// Formatted compare-at price (strikethrough price)
+  String? get formattedCompareAtPrice {
+    if (compareAtPricePaise == null || compareAtPricePaise == 0) return null;
+    final rupees = compareAtPricePaise! / 100.0;
+    return '₹${rupees.toStringAsFixed(rupees.truncateToDouble() == rupees ? 0 : 2)}';
+  }
+
+  /// Discount percentage
+  int? get discountPercent {
+    if (compareAtPricePaise == null || compareAtPricePaise == 0 || pricePaise == null || pricePaise == 0) return null;
+    if (compareAtPricePaise! <= pricePaise!) return null;
+    return (((compareAtPricePaise! - pricePaise!) / compareAtPricePaise!) * 100).round();
+  }
+
   String get firstImageUrl {
     if (imageUrls != null && imageUrls!.isNotEmpty) return imageUrls!.first;
     if (images != null && images!.isNotEmpty) return images!.first.addBaseURL();
@@ -156,6 +258,61 @@ class Product {
         return 'Unknown';
     }
   }
+}
+
+class ProductVariant {
+  int? id;
+  int? productId;
+  String? size;
+  String? color;
+  String? sku;
+  int? pricePaise;
+  double? priceRupees;
+  int? stock;
+  List<String>? images;
+  List<String>? imageUrls;
+  bool? isActive;
+
+  ProductVariant({
+    this.id,
+    this.productId,
+    this.size,
+    this.color,
+    this.sku,
+    this.pricePaise,
+    this.priceRupees,
+    this.stock,
+    this.images,
+    this.imageUrls,
+    this.isActive,
+  });
+
+  ProductVariant.fromJson(Map<String, dynamic> json) {
+    id = json['id'];
+    productId = json['product_id'];
+    size = json['size'];
+    color = json['color'];
+    sku = json['sku'];
+    pricePaise = json['price_paise'];
+    priceRupees = (json['price_rupees'] as num?)?.toDouble();
+    stock = json['stock'];
+    if (json['images'] != null) {
+      images = List<String>.from(json['images']);
+    }
+    if (json['image_urls'] != null) {
+      imageUrls = List<String>.from(json['image_urls']);
+    }
+    isActive = json['is_active'] != false;
+  }
+
+  String get label {
+    final parts = <String>[];
+    if (size != null && size!.isNotEmpty) parts.add(size!);
+    if (color != null && color!.isNotEmpty) parts.add(color!);
+    return parts.join(' / ');
+  }
+
+  bool get isInStock => stock == -1 || (stock != null && stock! > 0);
 }
 
 class ProductSeller {
@@ -300,11 +457,25 @@ class ProductOrder {
   int? sellerId;
   int? quantity;
   int? totalCoins;
-  int? status; // 0=pending, 1=confirmed, 2=shipped, 3=delivered, 4=cancelled, 5=refunded
+  int? status; // 0=pending, 1=confirmed, 2=shipped, 3=delivered, 4=cancelled, 5=refunded, 6=return_requested, 7=return_in_progress, 8=return_completed
   String? shippingAddress;
   String? trackingNumber;
   String? buyerNote;
   String? sellerNote;
+  // Real money fields
+  int? totalAmountPaise;
+  int? shippingChargePaise;
+  int? gstAmountPaise;
+  String? paymentMethod; // prepaid, cod
+  String? shippingMethod; // self, shiprocket, delhivery
+  String? awbCode;
+  String? courierName;
+  String? shippingLabelUrl;
+  String? estimatedDeliveryDate;
+  String? deliveredAt;
+  String? returnWindowExpiresAt;
+  String? invoiceNumber;
+  List<OrderItem>? items;
   Product? product;
   ProductSeller? buyer;
   ProductSeller? seller;
@@ -322,6 +493,19 @@ class ProductOrder {
     this.trackingNumber,
     this.buyerNote,
     this.sellerNote,
+    this.totalAmountPaise,
+    this.shippingChargePaise,
+    this.gstAmountPaise,
+    this.paymentMethod,
+    this.shippingMethod,
+    this.awbCode,
+    this.courierName,
+    this.shippingLabelUrl,
+    this.estimatedDeliveryDate,
+    this.deliveredAt,
+    this.returnWindowExpiresAt,
+    this.invoiceNumber,
+    this.items,
     this.product,
     this.buyer,
     this.seller,
@@ -336,19 +520,50 @@ class ProductOrder {
     quantity = json['quantity'];
     totalCoins = json['total_coins'];
     status = json['status'];
-    shippingAddress = json['shipping_address'];
+    shippingAddress = json['shipping_address'] is String ? json['shipping_address'] : null;
     trackingNumber = json['tracking_number'];
     buyerNote = json['buyer_note'];
     sellerNote = json['seller_note'];
-    product =
-        json['product'] != null ? Product.fromJson(json['product']) : null;
-    buyer = json['buyer'] != null
-        ? ProductSeller.fromJson(json['buyer'])
-        : null;
-    seller = json['seller'] != null
-        ? ProductSeller.fromJson(json['seller'])
-        : null;
+    totalAmountPaise = json['total_amount_paise'];
+    shippingChargePaise = json['shipping_charge_paise'];
+    gstAmountPaise = json['gst_amount_paise'];
+    paymentMethod = json['payment_method'];
+    shippingMethod = json['shipping_method'];
+    awbCode = json['awb_code'];
+    courierName = json['courier_name'];
+    shippingLabelUrl = json['shipping_label_url'];
+    estimatedDeliveryDate = json['estimated_delivery_date'];
+    deliveredAt = json['delivered_at'];
+    returnWindowExpiresAt = json['return_window_expires_at'];
+    invoiceNumber = json['invoice_number'];
+    if (json['items'] != null) {
+      items = [];
+      json['items'].forEach((v) {
+        items!.add(OrderItem.fromJson(v));
+      });
+    }
+    product = json['product'] != null ? Product.fromJson(json['product']) : null;
+    buyer = json['buyer'] != null ? ProductSeller.fromJson(json['buyer']) : null;
+    seller = json['seller'] != null ? ProductSeller.fromJson(json['seller']) : null;
     createdAt = json['created_at'];
+  }
+
+  /// Display total in rupees
+  double get totalRupees => (totalAmountPaise ?? 0) / 100.0;
+
+  /// Formatted total (e.g., "₹999")
+  String get formattedTotal {
+    if (totalAmountPaise != null && totalAmountPaise! > 0) {
+      final rupees = totalAmountPaise! / 100.0;
+      return '₹${rupees.toStringAsFixed(rupees.truncateToDouble() == rupees ? 0 : 2)}';
+    }
+    if (totalCoins != null && totalCoins! > 0) return '$totalCoins coins';
+    return '₹0';
+  }
+
+  bool get isReturnWindowOpen {
+    if (returnWindowExpiresAt == null) return false;
+    return DateTime.tryParse(returnWindowExpiresAt!)?.isAfter(DateTime.now()) ?? false;
   }
 
   String get statusLabel {
@@ -365,10 +580,44 @@ class ProductOrder {
         return 'Cancelled';
       case 5:
         return 'Refunded';
+      case 6:
+        return 'Return Requested';
+      case 7:
+        return 'Return In Progress';
+      case 8:
+        return 'Return Completed';
       default:
         return 'Unknown';
     }
   }
+}
+
+class OrderItem {
+  int? id;
+  int? orderId;
+  int? productId;
+  int? variantId;
+  int? quantity;
+  int? pricePaise;
+  String? variantLabel;
+  Product? product;
+  ProductVariant? variant;
+
+  OrderItem({this.id, this.orderId, this.productId, this.variantId, this.quantity, this.pricePaise, this.variantLabel, this.product, this.variant});
+
+  OrderItem.fromJson(Map<String, dynamic> json) {
+    id = json['id'];
+    orderId = json['order_id'];
+    productId = json['product_id'];
+    variantId = json['variant_id'];
+    quantity = json['quantity'];
+    pricePaise = json['price_paise'];
+    variantLabel = json['variant_label'];
+    product = json['product'] != null ? Product.fromJson(json['product']) : null;
+    variant = json['variant'] != null ? ProductVariant.fromJson(json['variant']) : null;
+  }
+
+  double get priceRupees => (pricePaise ?? 0) / 100.0;
 }
 
 class FeaturedProductsModel {

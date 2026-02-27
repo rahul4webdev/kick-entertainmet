@@ -2,6 +2,7 @@ import 'package:figma_squircle_updated/figma_squircle.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:shortzz/common/extensions/string_extension.dart';
+import 'package:shortzz/common/manager/session_manager.dart';
 import 'package:shortzz/common/widget/custom_back_button.dart';
 import 'package:shortzz/common/widget/custom_image.dart';
 import 'package:shortzz/common/widget/loader_widget.dart';
@@ -9,6 +10,7 @@ import 'package:shortzz/common/widget/no_data_widget.dart';
 import 'package:shortzz/languages/languages_keys.dart';
 import 'package:shortzz/model/product/product_model.dart';
 import 'package:shortzz/screen/cart_screen/cart_screen.dart';
+import 'package:shortzz/screen/seller_kyc_screen/seller_kyc_screen.dart';
 import 'package:shortzz/screen/shop_screen/shop_controller.dart';
 import 'package:shortzz/screen/shop_screen/product_detail_screen.dart';
 import 'package:shortzz/utilities/asset_res.dart';
@@ -362,19 +364,13 @@ class _FeaturedCarousel extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                Icon(Icons.monetization_on_outlined,
-                                    size: 12,
-                                    color: themeAccentSolid(context)),
-                                const SizedBox(width: 2),
-                                Text(
-                                  '${product.priceCoins ?? 0}',
-                                  style: TextStyleCustom.outFitMedium500(
-                                      color: themeAccentSolid(context),
-                                      fontSize: 12),
-                                ),
-                              ],
+                            Text(
+                              product.pricePaise != null && product.pricePaise! > 0
+                                  ? product.formattedPrice
+                                  : '${product.priceCoins ?? 0} coins',
+                              style: TextStyleCustom.outFitMedium500(
+                                  color: themeAccentSolid(context),
+                                  fontSize: 12),
                             ),
                           ],
                         ),
@@ -539,16 +535,16 @@ class _ProductCard extends StatelessWidget {
                       ),
                     Row(
                       children: [
-                        Icon(Icons.monetization_on_outlined,
-                            size: 14, color: themeAccentSolid(context)),
-                        const SizedBox(width: 3),
-                        Text(
-                          '${product.priceCoins ?? 0}',
-                          style: TextStyleCustom.outFitMedium500(
-                              color: themeAccentSolid(context),
-                              fontSize: 14),
+                        Expanded(
+                          child: Text(
+                            product.pricePaise != null && product.pricePaise! > 0
+                                ? product.formattedPrice
+                                : '${product.priceCoins ?? 0} coins',
+                            style: TextStyleCustom.outFitMedium500(
+                                color: themeAccentSolid(context),
+                                fontSize: 14),
+                          ),
                         ),
-                        const Spacer(),
                         if (product.soldCount != null &&
                             product.soldCount! > 0)
                           Text(
@@ -577,6 +573,10 @@ class _MyProductsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = SessionManager.instance.getUser();
+    if (user?.isApprovedSeller != true) {
+      return _SellerKycPrompt();
+    }
     return Obx(() {
       if (controller.isLoadingMyProducts.value &&
           controller.myProducts.isEmpty) {
@@ -655,7 +655,9 @@ class _MyProductRow extends StatelessWidget {
                       _StatusBadge(product: product),
                       const SizedBox(width: 8),
                       Text(
-                        '${product.priceCoins ?? 0} ${LKey.coinsText}',
+                        product.pricePaise != null && product.pricePaise! > 0
+                            ? product.formattedPrice
+                            : '${product.priceCoins ?? 0} ${LKey.coinsText}',
                         style: TextStyleCustom.outFitLight300(
                             color: textLightGrey(context), fontSize: 12),
                       ),
@@ -825,7 +827,9 @@ class _OrderRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${order.totalCoins ?? 0} ${LKey.coinsText} x${order.quantity ?? 1}',
+                      order.totalAmountPaise != null && order.totalAmountPaise! > 0
+                          ? '₹${(order.totalAmountPaise! / 100.0).toStringAsFixed(2)} x${order.quantity ?? 1}'
+                          : '${order.totalCoins ?? 0} ${LKey.coinsText} x${order.quantity ?? 1}',
                       style: TextStyleCustom.outFitLight300(
                           color: textLightGrey(context), fontSize: 12),
                     ),
@@ -872,6 +876,10 @@ class _SellerOrdersTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = SessionManager.instance.getUser();
+    if (user?.isApprovedSeller != true) {
+      return _SellerKycPrompt();
+    }
     return Obx(() {
       if (controller.isLoadingSellerOrders.value &&
           controller.sellerOrders.isEmpty) {
@@ -1009,6 +1017,70 @@ class _ActionButton extends StatelessWidget {
           label,
           style: TextStyleCustom.outFitMedium500(
               color: color, fontSize: 11),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Seller KYC Prompt ──────────────────────────────────────
+
+class _SellerKycPrompt extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: ShapeDecoration(
+                color: themeAccentSolid(context).withValues(alpha: .1),
+                shape: SmoothRectangleBorder(
+                  borderRadius:
+                      SmoothBorderRadius(cornerRadius: 24, cornerSmoothing: 1),
+                ),
+              ),
+              child: Icon(Icons.storefront_outlined,
+                  size: 40, color: themeAccentSolid(context)),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Become a Seller',
+              style: TextStyleCustom.unboundedSemiBold600(
+                  color: textDarkGrey(context), fontSize: 18),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Complete your seller verification to list products and manage orders on the marketplace.',
+              textAlign: TextAlign.center,
+              style: TextStyleCustom.outFitRegular400(
+                  color: textLightGrey(context), fontSize: 14),
+            ),
+            const SizedBox(height: 24),
+            GestureDetector(
+              onTap: () => Get.to(() => const SellerKycScreen()),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                decoration: ShapeDecoration(
+                  color: themeAccentSolid(context),
+                  shape: SmoothRectangleBorder(
+                    borderRadius: SmoothBorderRadius(
+                        cornerRadius: 12, cornerSmoothing: 1),
+                  ),
+                ),
+                child: Text(
+                  'Apply Now',
+                  style: TextStyleCustom.outFitMedium500(
+                      color: Colors.white, fontSize: 14),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

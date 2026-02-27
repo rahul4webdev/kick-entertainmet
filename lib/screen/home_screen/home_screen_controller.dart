@@ -67,15 +67,13 @@ class HomeScreenController extends BaseController with GetSingleTickerProviderSt
       _onNotificationTap(),
       _fetchLocation(),
       _readDeepLink(),
-    ]);
+    ]).catchError((e) {
+      Loggers.error('Home init error: $e');
+      isLoading.value = false;
+      return <void>[];
+    });
 
     super.onInit();
-  }
-
-  @override
-  void onReady() {
-    isLoading.value = true;
-    super.onReady();
   }
 
   @override
@@ -97,8 +95,6 @@ class HomeScreenController extends BaseController with GetSingleTickerProviderSt
     selectedHomeTab.value = tab;
     if (tab == HomeTab.reels) {
       onRefreshPage(reset: true);
-    } else if (tab == HomeTab.local) {
-      _fetchLocalFeed(true);
     } else {
       resetContentFilters();
       fetchContentForTab(reset: true);
@@ -195,6 +191,9 @@ class HomeScreenController extends BaseController with GetSingleTickerProviderSt
           selectedReelCategory.value = TabType.discover;
         }
         break;
+      case TabType.news:
+        await _fetchNewsPost(reset);
+        break;
     }
   }
 
@@ -226,49 +225,59 @@ class HomeScreenController extends BaseController with GetSingleTickerProviderSt
 
   Future<void> fetchDiscoverPost(bool resetData) async {
     isLoading.value = true;
-    PostsModel model = await PostService.instance.fetchPostsDiscover(type: PostType.reels, cancelToken: token);
-    addResponseData(model.data ?? [], model.adPositions ?? [], resetData);
+    try {
+      PostsModel model = await PostService.instance.fetchPostsDiscover(type: PostType.reels, cancelToken: token);
+      addResponseData(model.data ?? [], model.adPositions ?? [], resetData);
+    } catch (e) {
+      Loggers.error('Fetch discover error: $e');
+      isLoading.value = false;
+    }
   }
 
   Future<void> _fetchFollowingPost(bool resetData) async {
     isLoading.value = true;
-    PostsModel model = await PostService.instance.fetchPostsFollowing(type: PostType.reels, cancelToken: token);
-    addResponseData(model.data ?? [], model.adPositions ?? [], resetData);
+    try {
+      PostsModel model = await PostService.instance.fetchPostsFollowing(type: PostType.reels, cancelToken: token);
+      addResponseData(model.data ?? [], model.adPositions ?? [], resetData);
+    } catch (e) {
+      Loggers.error('Fetch following error: $e');
+      isLoading.value = false;
+    }
   }
 
   Future<void> _fetchFavoritesPost(bool resetData) async {
     isLoading.value = true;
-    PostsModel model = await PostService.instance.fetchPostsFavorites(type: PostType.reels, cancelToken: token);
-    addResponseData(model.data ?? [], model.adPositions ?? [], resetData);
+    try {
+      PostsModel model = await PostService.instance.fetchPostsFavorites(type: PostType.reels, cancelToken: token);
+      addResponseData(model.data ?? [], model.adPositions ?? [], resetData);
+    } catch (e) {
+      Loggers.error('Fetch favorites error: $e');
+      isLoading.value = false;
+    }
   }
 
   Future<void> _fetchPostsNearBy(bool resetData) async {
     isLoading.value = true;
-    Position position = await LocationService.instance.getCurrentLocation(isPermissionDialogShow: true);
-    PostsModel model = await PostService.instance.fetchPostsNearBy(
-        type: PostType.reels, placeLat: position.latitude, placeLon: position.longitude, cancelToken: token);
-    addResponseData(model.data ?? [], model.adPositions ?? [], resetData);
-  }
-
-  Future<void> _fetchLocalFeed(bool resetData) async {
-    isContentLoading.value = true;
     try {
       Position position = await LocationService.instance.getCurrentLocation(isPermissionDialogShow: true);
       PostsModel model = await PostService.instance.fetchPostsNearBy(
           type: PostType.reels, placeLat: position.latitude, placeLon: position.longitude, cancelToken: token);
-      if (resetData) {
-        contentPosts.clear();
-        contentFeedItems.clear();
-      }
-      final posts = model.data ?? [];
-      if (posts.isNotEmpty) {
-        contentPosts.addAll(posts);
-        contentFeedItems.addAll(FeedItemMerger.merge(posts, model.adPositions ?? []));
-      }
+      addResponseData(model.data ?? [], model.adPositions ?? [], resetData);
     } catch (e) {
-      Loggers.error('Local feed error: $e');
-    } finally {
-      isContentLoading.value = false;
+      Loggers.error('Fetch nearby error: $e');
+      isLoading.value = false;
+    }
+  }
+
+  Future<void> _fetchNewsPost(bool resetData) async {
+    isLoading.value = true;
+    try {
+      PostsModel model = await PostService.instance.fetchContentByType(
+          contentType: 3, subTab: 'for_you', cancelToken: token);
+      addResponseData(model.data ?? [], model.adPositions ?? [], resetData);
+    } catch (e) {
+      Loggers.error('Fetch news error: $e');
+      isLoading.value = false;
     }
   }
 

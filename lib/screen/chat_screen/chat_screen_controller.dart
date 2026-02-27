@@ -95,6 +95,7 @@ class ChatScreenController extends BlockUserController
   RxList<MessageData> chatList = <MessageData>[].obs;
 
   StreamSubscription<PlayerState>? playerControllerListen;
+  final List<MapEntry<String, dynamic Function(dynamic)>> _socketSubs = [];
 
   int? _lastMessageId;
 
@@ -177,10 +178,13 @@ class ChatScreenController extends BlockUserController
     }
   }
 
-  void _listenToSocketEvents() {
-    final socket = ChatSocketService.instance;
+  void _addSocketListener(String event, dynamic Function(dynamic) handler) {
+    _socketSubs.add(MapEntry(event, handler));
+    ChatSocketService.instance.on(event, handler);
+  }
 
-    socket.on(ChatEvents.sNewMessage, (data) {
+  void _listenToSocketEvents() {
+    _addSocketListener(ChatEvents.sNewMessage, (data) {
       if (data is! Map) return;
       final message = MessageData.fromJson(Map<String, dynamic>.from(data));
       if (message.conversationId != conversationUser.value.conversationId) return;
@@ -193,17 +197,22 @@ class ChatScreenController extends BlockUserController
       // Auto-confirm delivery for messages from other user
       final myId = SessionManager.instance.getUserID();
       if (message.userId != myId && message.id != null) {
-        socket.emit(ChatEvents.cMessageDelivered, {
+        ChatSocketService.instance.emit(ChatEvents.cMessageDelivered, {
           'conversation_id': message.conversationId,
           'message_ids': [message.id],
         });
       }
     });
 
-    socket.on(ChatEvents.sConversationUpdate, (data) {
+    _addSocketListener(ChatEvents.sConversationUpdate, (data) {
       if (data is! Map) return;
       final thread = ChatThread.fromJson(Map<String, dynamic>.from(data));
       if (thread.conversationId != conversationUser.value.conversationId) return;
+
+      // Ignore self-perspective events (stale Redis socket delivers both user
+      // perspectives to this device — reject the one where other user == ourselves)
+      final myId = SessionManager.instance.getUserID();
+      if (thread.userId == myId) return;
 
       // Preserve chatUser if not in update
       final existingChatUser = conversationUser.value.chatUser;
@@ -214,28 +223,28 @@ class ChatScreenController extends BlockUserController
       Loggers.info('Chat Updated: ${thread.toJson()}');
     });
 
-    socket.on(ChatEvents.sMessageDeleted, (data) {
+    _addSocketListener(ChatEvents.sMessageDeleted, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) return;
       chatList.removeWhere((m) => m.id == map['message_id']);
     });
 
-    socket.on(ChatEvents.sMessageUnsent, (data) {
+    _addSocketListener(ChatEvents.sMessageUnsent, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) return;
       chatList.removeWhere((m) => m.id == map['message_id']);
     });
 
-    socket.on(ChatEvents.sTyping, (data) {
+    _addSocketListener(ChatEvents.sTyping, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) return;
       isOtherUserTyping.value = map['is_typing'] == true;
     });
 
-    socket.on(ChatEvents.sOnlineStatus, (data) {
+    _addSocketListener(ChatEvents.sOnlineStatus, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['user_id'] == conversationUser.value.userId) {
@@ -243,7 +252,7 @@ class ChatScreenController extends BlockUserController
       }
     });
 
-    socket.on(ChatEvents.sMessageReaction, (data) {
+    _addSocketListener(ChatEvents.sMessageReaction, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) {
@@ -264,7 +273,7 @@ class ChatScreenController extends BlockUserController
       }
     });
 
-    socket.on(ChatEvents.sMessageEdited, (data) {
+    _addSocketListener(ChatEvents.sMessageEdited, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) {
@@ -279,7 +288,7 @@ class ChatScreenController extends BlockUserController
       }
     });
 
-    socket.on(ChatEvents.sScheduledConfirmed, (data) {
+    _addSocketListener(ChatEvents.sScheduledConfirmed, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) return;
@@ -288,21 +297,21 @@ class ChatScreenController extends BlockUserController
       showSnackBar('Message scheduled');
     });
 
-    socket.on(ChatEvents.sScheduledCanceled, (data) {
+    _addSocketListener(ChatEvents.sScheduledCanceled, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) return;
       scheduledMessages.removeWhere((m) => m.id == map['scheduled_id']);
     });
 
-    socket.on(ChatEvents.sVanishToggled, (data) {
+    _addSocketListener(ChatEvents.sVanishToggled, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) return;
       isVanishMode.value = map['vanish_mode'] == true;
     });
 
-    socket.on(ChatEvents.sVanishCleared, (data) {
+    _addSocketListener(ChatEvents.sVanishCleared, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) return;
@@ -311,7 +320,7 @@ class ChatScreenController extends BlockUserController
     });
 
     // Read receipts + delivery
-    socket.on(ChatEvents.sMessageDelivered, (data) {
+    _addSocketListener(ChatEvents.sMessageDelivered, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) return;
@@ -327,7 +336,7 @@ class ChatScreenController extends BlockUserController
       chatList.refresh();
     });
 
-    socket.on(ChatEvents.sMessagesRead, (data) {
+    _addSocketListener(ChatEvents.sMessagesRead, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) return;
@@ -344,7 +353,7 @@ class ChatScreenController extends BlockUserController
     });
 
     // Link preview
-    socket.on(ChatEvents.sLinkPreview, (data) {
+    _addSocketListener(ChatEvents.sLinkPreview, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) return;
@@ -358,14 +367,14 @@ class ChatScreenController extends BlockUserController
     });
 
     // Pin/Unpin
-    socket.on(ChatEvents.sMessagePinned, (data) {
+    _addSocketListener(ChatEvents.sMessagePinned, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) return;
       showSnackBar('Message pinned');
     });
 
-    socket.on(ChatEvents.sMessageUnpinned, (data) {
+    _addSocketListener(ChatEvents.sMessageUnpinned, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) return;
@@ -373,14 +382,14 @@ class ChatScreenController extends BlockUserController
     });
 
     // Star/Unstar
-    socket.on(ChatEvents.sMessageStarred, (data) {
+    _addSocketListener(ChatEvents.sMessageStarred, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) return;
       showSnackBar('Message starred');
     });
 
-    socket.on(ChatEvents.sMessageUnstarred, (data) {
+    _addSocketListener(ChatEvents.sMessageUnstarred, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) return;
@@ -388,7 +397,7 @@ class ChatScreenController extends BlockUserController
     });
 
     // E2E Encryption
-    socket.on(ChatEvents.sEncryptionEnabled, (data) {
+    _addSocketListener(ChatEvents.sEncryptionEnabled, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) return;
@@ -396,7 +405,7 @@ class ChatScreenController extends BlockUserController
       showSnackBar('End-to-end encryption enabled');
     });
 
-    socket.on(ChatEvents.sEncryptionDisabled, (data) {
+    _addSocketListener(ChatEvents.sEncryptionDisabled, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) return;
@@ -405,7 +414,7 @@ class ChatScreenController extends BlockUserController
       showSnackBar('End-to-end encryption disabled');
     });
 
-    socket.on(ChatEvents.sKeyExchanged, (data) {
+    _addSocketListener(ChatEvents.sKeyExchanged, (data) {
       if (data is! Map) return;
       final map = Map<String, dynamic>.from(data);
       if (map['conversation_id'] != conversationUser.value.conversationId) return;
@@ -417,29 +426,10 @@ class ChatScreenController extends BlockUserController
   }
 
   void _removeSocketListeners() {
-    final socket = ChatSocketService.instance;
-    socket.off(ChatEvents.sNewMessage);
-    socket.off(ChatEvents.sConversationUpdate);
-    socket.off(ChatEvents.sMessageDeleted);
-    socket.off(ChatEvents.sMessageUnsent);
-    socket.off(ChatEvents.sTyping);
-    socket.off(ChatEvents.sOnlineStatus);
-    socket.off(ChatEvents.sMessageReaction);
-    socket.off(ChatEvents.sMessageEdited);
-    socket.off(ChatEvents.sScheduledConfirmed);
-    socket.off(ChatEvents.sScheduledCanceled);
-    socket.off(ChatEvents.sVanishToggled);
-    socket.off(ChatEvents.sVanishCleared);
-    socket.off(ChatEvents.sMessageDelivered);
-    socket.off(ChatEvents.sMessagesRead);
-    socket.off(ChatEvents.sLinkPreview);
-    socket.off(ChatEvents.sMessagePinned);
-    socket.off(ChatEvents.sMessageUnpinned);
-    socket.off(ChatEvents.sMessageStarred);
-    socket.off(ChatEvents.sMessageUnstarred);
-    socket.off(ChatEvents.sEncryptionEnabled);
-    socket.off(ChatEvents.sEncryptionDisabled);
-    socket.off(ChatEvents.sKeyExchanged);
+    for (final sub in _socketSubs) {
+      ChatSocketService.instance.off(sub.key, sub.value);
+    }
+    _socketSubs.clear();
   }
 
   void _loadInitialMessages() async {
@@ -590,6 +580,10 @@ class ChatScreenController extends BlockUserController
         return '${sentPrefix}a Story Reply';
       case MessageType.document:
         return '${sentPrefix}a Document';
+      case MessageType.callLog:
+        final ct = message.callType == 'video' ? 'Video' : 'Voice';
+        if (message.callStatus == 'missed') return 'Missed $ct call';
+        return '$ct call, ${message.callDuration ?? ''}';
     }
   }
 
@@ -929,6 +923,8 @@ class ChatScreenController extends BlockUserController
         break;
       case MessageType.document:
         break;
+      case MessageType.callLog:
+        break;
       case null:
         break;
     }
@@ -963,6 +959,12 @@ class ChatScreenController extends BlockUserController
       case UserRequestAction.accept:
         ChatSocketService.instance.emit(ChatEvents.cAcceptRequest, {
           'conversation_id': conversationUser.value.conversationId,
+        });
+        // Optimistic update: immediately reflect acceptance so the text field
+        // appears right away without waiting for the socket round-trip.
+        conversationUser.update((val) {
+          val?.chatType = ChatType.approved;
+          val?.requestType = 'accept';
         });
         break;
     }

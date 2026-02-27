@@ -33,7 +33,7 @@ class KeywordFiltersScreen extends StatelessWidget {
                   child: TextField(
                     controller: controller.textController,
                     style: TextStyleCustom.outFitRegular400(
-                        fontSize: 14, color: whitePure(context)),
+                        fontSize: 14, color: textDarkGrey(context)),
                     decoration: InputDecoration(
                       hintText: LKey.enterKeyword.tr,
                       hintStyle: TextStyleCustom.outFitRegular400(
@@ -86,7 +86,7 @@ class KeywordFiltersScreen extends StatelessWidget {
                         Text(
                           LKey.keywordFiltersEmpty.tr,
                           style: TextStyleCustom.outFitMedium500(
-                              fontSize: 16, color: whitePure(context)),
+                              fontSize: 16, color: textDarkGrey(context)),
                         ),
                         const SizedBox(height: 6),
                         Text(
@@ -110,7 +110,7 @@ class KeywordFiltersScreen extends StatelessWidget {
                     title: Text(
                       item['keyword'] ?? '',
                       style: TextStyleCustom.outFitRegular400(
-                          fontSize: 15, color: whitePure(context)),
+                          fontSize: 15, color: textDarkGrey(context)),
                     ),
                     trailing: IconButton(
                       icon: Icon(Icons.close,

@@ -83,6 +83,10 @@ class CreateFeedScreenController extends BaseController {
   RxList<User> selectedCollaborators = <User>[].obs;
   RxList<int> selectedProductTagIds = <int>[].obs;
 
+  // Series linking state
+  RxBool isPartOfSeries = false.obs;
+  Rx<Post?> linkedPreviousPost = Rx<Post?>(null);
+
   // Poll creation state
   TextEditingController pollQuestionController = TextEditingController();
   RxList<TextEditingController> pollOptionControllers =
@@ -202,6 +206,11 @@ class CreateFeedScreenController extends BaseController {
     // Product tags
     if (selectedProductTagIds.isNotEmpty) {
       params['product_tag_ids'] = selectedProductTagIds.join(',');
+    }
+
+    // Series linking
+    if (isPartOfSeries.value && linkedPreviousPost.value != null) {
+      params[Params.linkedPreviousPostId] = linkedPreviousPost.value!.id;
     }
 
     return params;

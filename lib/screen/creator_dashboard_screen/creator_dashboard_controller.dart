@@ -40,25 +40,29 @@ class CreatorDashboardController extends BaseController {
 
   Future<void> fetchDashboard() async {
     isLoading.value = true;
-    dashboardData.value = await CreatorDashboardService.instance
-        .fetchCreatorDashboard(period: selectedPeriod.value);
+    try {
+      dashboardData.value = await CreatorDashboardService.instance
+          .fetchCreatorDashboard(period: selectedPeriod.value);
+    } catch (_) {}
     isLoading.value = false;
   }
 
   Future<void> fetchAudience() async {
     isAudienceLoading.value = true;
-    audienceData.value =
-        await CreatorDashboardService.instance.fetchAudienceInsights();
+    try {
+      audienceData.value =
+          await CreatorDashboardService.instance.fetchAudienceInsights();
+    } catch (_) {}
     isAudienceLoading.value = false;
   }
 
   Future<void> _fetchMilestones() async {
-    // Check for new milestones first, then fetch all
-    final newOnes = await MilestoneService.instance.checkMilestones();
-    newMilestones.value = newOnes;
-
-    final all = await MilestoneService.instance.fetchMyMilestones();
-    milestones.value = all;
+    try {
+      final newOnes = await MilestoneService.instance.checkMilestones();
+      newMilestones.value = newOnes;
+      final all = await MilestoneService.instance.fetchMyMilestones();
+      milestones.value = all;
+    } catch (_) {}
   }
 
   Future<void> markMilestoneSeen(MilestoneModel milestone) async {
@@ -82,8 +86,10 @@ class CreatorDashboardController extends BaseController {
 
   Future<void> fetchSearchInsights() async {
     isSearchInsightsLoading.value = true;
-    searchInsightsData.value = await CreatorDashboardService.instance
-        .fetchSearchInsights(period: searchInsightsPeriod.value);
+    try {
+      searchInsightsData.value = await CreatorDashboardService.instance
+          .fetchSearchInsights(period: searchInsightsPeriod.value);
+    } catch (_) {}
     isSearchInsightsLoading.value = false;
   }
 

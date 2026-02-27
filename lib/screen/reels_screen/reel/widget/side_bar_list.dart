@@ -1,9 +1,7 @@
 import 'package:dotted_border/dotted_border.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:shortzz/common/extensions/string_extension.dart';
 import 'package:shortzz/common/manager/session_manager.dart';
-import 'package:shortzz/common/widget/custom_image.dart';
 import 'package:shortzz/common/widget/gradient_icon.dart';
 import 'package:shortzz/languages/languages_keys.dart';
 import 'package:shortzz/model/post_story/music/music_model.dart';
@@ -39,14 +37,6 @@ class SideBarList extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10),
         child: Column(
           children: [
-            CustomImage(
-              image: reel.user?.profilePhoto?.addBaseURL(),
-              fullName: reel.user?.fullname,
-              size: const Size(40, 40),
-              strokeWidth: 1.5,
-              onTap: () => controller.onUserTap(reel.user),
-            ),
-            const SizedBox(height: 7.5),
             IconWithLabel(
                 likeKey: likeKey,
                 onTap: () {
@@ -81,30 +71,12 @@ class SideBarList extends StatelessWidget {
               text: isPlaceholder ? '1' : (reel.shares ?? 0).toString(),
             ),
             Visibility(
-              visible: reel.user?.id != SessionManager.instance.getUserID(),
-              child: IconWithLabel(
-                onTap: isPlaceholder ? () {} : controller.onRepostTap,
-                image: AssetRes.icShare2,
-                text: isPlaceholder ? '' : (reel.repostCount ?? 0).toString(),
-              ),
-            ),
-            Visibility(
               visible: reel.user?.id != SessionManager.instance.getUserID() &&
                   reel.allowDuet &&
                   reel.postType == PostType.reel,
               child: IconWithLabel(
                 onTap: isPlaceholder ? () {} : controller.onDuetTap,
                 image: AssetRes.icDuet,
-                text: '',
-              ),
-            ),
-            Visibility(
-              visible: reel.user?.id != SessionManager.instance.getUserID() &&
-                  reel.allowStitch &&
-                  reel.postType == PostType.reel,
-              child: IconWithLabel(
-                onTap: isPlaceholder ? () {} : controller.onStitchTap,
-                image: AssetRes.icStitch,
                 text: '',
               ),
             ),
@@ -145,6 +117,9 @@ class SideBarList extends StatelessWidget {
 }
 
 void _showMoreSheet(BuildContext context, ReelController controller) {
+  final reel = controller.reelData.value;
+  final isOwn = reel.user?.id == SessionManager.instance.getUserID();
+
   Get.bottomSheet(
     SafeArea(
       child: Container(
@@ -165,6 +140,34 @@ void _showMoreSheet(BuildContext context, ReelController controller) {
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
+            if (!isOwn)
+              ListTile(
+                leading: Image.asset(AssetRes.icShare2,
+                    width: 24, height: 24, color: blackPure(context)),
+                title: Text(
+                  'Repost',
+                  style: TextStyleCustom.outFitMedium500(
+                      fontSize: 15, color: blackPure(context)),
+                ),
+                onTap: () {
+                  Get.back();
+                  controller.onRepostTap();
+                },
+              ),
+            if (!isOwn && reel.allowStitch && reel.postType == PostType.reel)
+              ListTile(
+                leading: Image.asset(AssetRes.icStitch,
+                    width: 24, height: 24, color: blackPure(context)),
+                title: Text(
+                  'Stitch',
+                  style: TextStyleCustom.outFitMedium500(
+                      fontSize: 15, color: blackPure(context)),
+                ),
+                onTap: () {
+                  Get.back();
+                  controller.onStitchTap();
+                },
+              ),
             ListTile(
               leading: Icon(Icons.not_interested, color: blackPure(context)),
               title: Text(

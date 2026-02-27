@@ -103,7 +103,7 @@ class ChatTopProfileView extends StatelessWidget {
               ),
               GestureDetector(
                 onTap: () => CallHelper.startCall(
-                  userId: chatUser?.userId ?? 0,
+                  userId: chatUser?.userId ?? chatThread.userId ?? 0,
                   fullname: chatUser?.fullname ?? '',
                   username: chatUser?.username,
                   profilePhoto: chatUser?.profile,
@@ -120,7 +120,7 @@ class ChatTopProfileView extends StatelessWidget {
               ),
               GestureDetector(
                 onTap: () => CallHelper.startCall(
-                  userId: chatUser?.userId ?? 0,
+                  userId: chatUser?.userId ?? chatThread.userId ?? 0,
                   fullname: chatUser?.fullname ?? '',
                   username: chatUser?.username,
                   profilePhoto: chatUser?.profile,

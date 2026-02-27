@@ -23,7 +23,9 @@ class KeywordFiltersScreenController extends BaseController {
 
   Future<void> _loadKeywords() async {
     isDataLoading.value = true;
-    keywords.value = await UserService.instance.fetchMyKeywordFilters();
+    try {
+      keywords.value = await UserService.instance.fetchMyKeywordFilters();
+    } catch (_) {}
     isDataLoading.value = false;
   }
 
@@ -37,26 +39,32 @@ class KeywordFiltersScreenController extends BaseController {
     }
 
     showLoader(barrierDismissible: true);
-    final result =
-        await UserService.instance.addKeywordFilter(keyword: keyword);
-    stopLoader();
-
-    if (result.status == true) {
-      textController.clear();
-      await _loadKeywords();
+    try {
+      final result =
+          await UserService.instance.addKeywordFilter(keyword: keyword);
+      stopLoader();
+      if (result.status == true) {
+        textController.clear();
+        await _loadKeywords();
+      }
+      showSnackBar(result.message);
+    } catch (_) {
+      stopLoader();
     }
-    showSnackBar(result.message);
   }
 
   Future<void> removeKeyword(int keywordId) async {
     showLoader(barrierDismissible: true);
-    final result =
-        await UserService.instance.removeKeywordFilter(keywordId: keywordId);
-    stopLoader();
-
-    if (result.status == true) {
-      keywords.removeWhere((k) => k['id'] == keywordId);
+    try {
+      final result =
+          await UserService.instance.removeKeywordFilter(keywordId: keywordId);
+      stopLoader();
+      if (result.status == true) {
+        keywords.removeWhere((k) => k['id'] == keywordId);
+      }
+      showSnackBar(result.message);
+    } catch (_) {
+      stopLoader();
     }
-    showSnackBar(result.message);
   }
 }

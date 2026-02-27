@@ -24,6 +24,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Product? detail;
   bool isLoading = true;
   int currentImageIndex = 0;
+  ProductVariant? selectedVariant;
 
   @override
   void initState() {
@@ -138,18 +139,43 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                         ),
                         const SizedBox(height: 8),
 
-                        // Price row
+                        // Price row — INR pricing
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            Icon(Icons.monetization_on_outlined,
-                                size: 22, color: themeAccentSolid(context)),
-                            const SizedBox(width: 6),
                             Text(
-                              '${product.priceCoins ?? 0} ${LKey.coinsText}',
+                              _displayPrice(product),
                               style: TextStyleCustom.unboundedSemiBold600(
                                   fontSize: 22,
                                   color: themeAccentSolid(context)),
                             ),
+                            if (product.formattedCompareAtPrice != null) ...[
+                              const SizedBox(width: 8),
+                              Text(
+                                product.formattedCompareAtPrice!,
+                                style: TextStyleCustom.outFitLight300(
+                                  color: textLightGrey(context),
+                                  fontSize: 14,
+                                ).copyWith(
+                                    decoration: TextDecoration.lineThrough),
+                              ),
+                            ],
+                            if (product.discountPercent != null) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.withValues(alpha: .1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  '${product.discountPercent}% off',
+                                  style: TextStyleCustom.outFitMedium500(
+                                      color: Colors.green, fontSize: 11),
+                                ),
+                              ),
+                            ],
                             const Spacer(),
                             if (product.soldCount != null &&
                                 product.soldCount! > 0)
@@ -161,6 +187,157 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               ),
                           ],
                         ),
+
+                        // Shipping & COD info
+                        if (product.pricePaise != null &&
+                            product.pricePaise! > 0) ...[
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 12,
+                            children: [
+                              if (product.shippingChargeRupees != null &&
+                                  product.shippingChargeRupees! > 0)
+                                Text(
+                                  '+ ₹${product.shippingChargeRupees!.toStringAsFixed(0)} shipping',
+                                  style: TextStyleCustom.outFitLight300(
+                                      color: textLightGrey(context),
+                                      fontSize: 12),
+                                )
+                              else
+                                Text(
+                                  'Free Shipping',
+                                  style: TextStyleCustom.outFitLight300(
+                                      color: Colors.green, fontSize: 12),
+                                ),
+                              if (product.codAvailable == true)
+                                Text(
+                                  'COD Available',
+                                  style: TextStyleCustom.outFitLight300(
+                                      color: Colors.green, fontSize: 12),
+                                ),
+                              if (product.isReturnable == true)
+                                Text(
+                                  '${product.returnWindowDays ?? 7} day returns',
+                                  style: TextStyleCustom.outFitLight300(
+                                      color: Colors.blue, fontSize: 12),
+                                ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+
+                        // Variant selector
+                        if (product.hasVariants == true &&
+                            product.variants != null &&
+                            product.variants!.isNotEmpty) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            'Select Variant',
+                            style: TextStyleCustom.outFitMedium500(
+                                color: textDarkGrey(context), fontSize: 14),
+                          ),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children:
+                                product.variants!.map((variant) {
+                              final isSelected =
+                                  selectedVariant?.id == variant.id;
+                              final label = [
+                                if (variant.size != null) variant.size,
+                                if (variant.color != null) variant.color,
+                              ].join(' / ');
+                              final outOfStock =
+                                  variant.stock != null && variant.stock! <= 0;
+                              return GestureDetector(
+                                onTap: outOfStock
+                                    ? null
+                                    : () => setState(
+                                        () => selectedVariant = variant),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 8),
+                                  decoration: ShapeDecoration(
+                                    color: outOfStock
+                                        ? bgMediumGrey(context)
+                                        : isSelected
+                                            ? themeAccentSolid(context)
+                                                .withValues(alpha: .1)
+                                            : bgLightGrey(context),
+                                    shape: SmoothRectangleBorder(
+                                      borderRadius: SmoothBorderRadius(
+                                          cornerRadius: 10,
+                                          cornerSmoothing: 1),
+                                      side: BorderSide(
+                                        color: isSelected
+                                            ? themeAccentSolid(context)
+                                            : Colors.transparent,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        label.isNotEmpty ? label : 'Option',
+                                        style: TextStyleCustom.outFitMedium500(
+                                          color: outOfStock
+                                              ? textLightGrey(context)
+                                              : isSelected
+                                                  ? themeAccentSolid(context)
+                                                  : textDarkGrey(context),
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      if (variant.priceRupees != null &&
+                                          variant.priceRupees! > 0)
+                                        Text(
+                                          '₹${variant.priceRupees!.toStringAsFixed(variant.priceRupees!.truncateToDouble() == variant.priceRupees! ? 0 : 2)}',
+                                          style:
+                                              TextStyleCustom.outFitLight300(
+                                            color: outOfStock
+                                                ? textLightGrey(context)
+                                                : themeAccentSolid(context),
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      if (outOfStock)
+                                        Text(
+                                          'Out of stock',
+                                          style:
+                                              TextStyleCustom.outFitLight300(
+                                                  color: Colors.red,
+                                                  fontSize: 10),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                          const SizedBox(height: 4),
+                        ],
+
+                        // Brand
+                        if (product.brandName != null &&
+                            product.brandName!.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(Icons.business_outlined,
+                                  size: 14, color: textLightGrey(context)),
+                              const SizedBox(width: 4),
+                              Text(
+                                product.brandName!,
+                                style: TextStyleCustom.outFitLight300(
+                                    color: textLightGrey(context),
+                                    fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 4),
 
                         // Stock info
@@ -351,7 +528,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                           ),
                           child: Center(
                             child: Text(
-                              '${LKey.buyNow} - ${product.priceCoins ?? 0}',
+                              '${LKey.buyNow} - ${_displayPrice(product)}',
                               style: TextStyleCustom.outFitMedium500(
                                   color: whitePure(context), fontSize: 14),
                             ),
@@ -367,10 +544,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  String _displayPrice(Product product) {
+    if (selectedVariant != null &&
+        selectedVariant!.priceRupees != null &&
+        selectedVariant!.priceRupees! > 0) {
+      final r = selectedVariant!.priceRupees!;
+      return '₹${r.toStringAsFixed(r.truncateToDouble() == r ? 0 : 2)}';
+    }
+    if (product.pricePaise != null && product.pricePaise! > 0) {
+      return product.formattedPrice;
+    }
+    return '${product.priceCoins ?? 0} ${LKey.coinsText}';
+  }
+
   Future<void> _addToCart(Product product) async {
+    if (product.hasVariants == true &&
+        product.variants != null &&
+        product.variants!.isNotEmpty &&
+        selectedVariant == null) {
+      Get.snackbar('Select Variant', 'Please select a variant first',
+          snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
     try {
       final response = await CartService.instance.addToCart(
         productId: product.id!,
+        variantId: selectedVariant?.id,
       );
       if (response.status == true) {
         Get.snackbar(LKey.addedToCart, '',
@@ -387,6 +586,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   }
 
   void _showPurchaseConfirm(BuildContext context, Product product) {
+    if (product.hasVariants == true &&
+        product.variants != null &&
+        product.variants!.isNotEmpty &&
+        selectedVariant == null) {
+      Get.snackbar('Select Variant', 'Please select a variant first',
+          snackPosition: SnackPosition.BOTTOM);
+      return;
+    }
+
+    // For INR-priced products, add to cart and go to checkout
+    if (product.pricePaise != null && product.pricePaise! > 0) {
+      _addToCart(product).then((_) {
+        Get.toNamed('/cart');
+      });
+      return;
+    }
+
+    // Coin-based purchase (legacy)
     Get.dialog(
       AlertDialog(
         title: Text(LKey.confirmPurchase),

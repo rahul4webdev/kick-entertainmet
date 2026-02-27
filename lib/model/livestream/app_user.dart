@@ -15,12 +15,13 @@ class AppUser {
       this.identity});
 
   AppUser.fromJson(Map<String, dynamic> json) {
-    userId = json['user_id'];
+    userId = json['user_id'] is String ? int.tryParse(json['user_id']) : json['user_id'] as int?;
     identity = json['identity'];
     username = json['username'];
     fullname = json['fullname'];
     profile = json['profile'];
-    isVerify = json['is_verify'];
+    final iv = json['is_verify'];
+    isVerify = iv is bool ? (iv ? 1 : 0) : iv is String ? int.tryParse(iv) : iv as int?;
   }
 
   Map<String, dynamic> toJson() {

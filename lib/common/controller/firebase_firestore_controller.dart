@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:get/get.dart';
 import 'package:shortzz/common/controller/base_controller.dart';
 import 'package:shortzz/common/manager/logger.dart';
-import 'package:shortzz/common/service/chat/chat_api_service.dart';
+import 'package:shortzz/common/service/api/user_service.dart';
 import 'package:shortzz/model/livestream/app_user.dart';
 import 'package:shortzz/model/user_model/user_model.dart';
 
@@ -23,8 +23,16 @@ class FirebaseFirestoreController extends BaseController {
 
     Loggers.info('[LOAD_USER] Fetching user $userId from REST');
 
-    ChatApiService.instance.fetchChatUser(userId).then((appUser) {
-      if (appUser != null) {
+    UserService.instance.fetchUserDetails(userId: userId).then((user) {
+      if (user != null) {
+        final appUser = AppUser(
+          userId: user.id,
+          username: user.username,
+          fullname: user.fullname,
+          profile: user.profilePhoto,
+          isVerify: user.isVerify,
+          identity: user.identity,
+        );
         users.add(appUser);
         Loggers.info('[LOAD_USER] User ${appUser.userId} added to list');
       } else {

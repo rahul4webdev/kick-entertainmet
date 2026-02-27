@@ -10,9 +10,9 @@ class MessageReaction {
   MessageReaction({this.userId, this.emoji, this.createdAt});
 
   MessageReaction.fromJson(Map<String, dynamic> json) {
-    userId = json['user_id'];
+    userId = json['user_id'] is String ? int.tryParse(json['user_id']) : json['user_id'] as int?;
     emoji = json['emoji'];
-    createdAt = json['created_at'];
+    createdAt = json['created_at'] is String ? int.tryParse(json['created_at']) : json['created_at'] as int?;
   }
 
   Map<String, dynamic> toJson() => {
@@ -31,8 +31,8 @@ class ReplyTo {
   ReplyTo({this.messageId, this.userId, this.textPreview, this.messageType});
 
   ReplyTo.fromJson(Map<String, dynamic> json) {
-    messageId = json['message_id'];
-    userId = json['user_id'];
+    messageId = json['message_id'] is String ? int.tryParse(json['message_id']) : json['message_id'] as int?;
+    userId = json['user_id'] is String ? int.tryParse(json['user_id']) : json['user_id'] as int?;
     textPreview = json['text_preview'];
     messageType = json['message_type'];
   }
@@ -138,6 +138,13 @@ class MessageData {
   bool? isEncrypted;
   int? encryptionVersion;
 
+  // Call log fields
+  int? callId;
+  String? callType; // 'voice' or 'video'
+  String? callStatus; // 'completed', 'missed', 'rejected'
+  String? callDuration; // e.g. "2 min", "45 sec"
+  int? durationSeconds;
+
   MessageData(
       {this.userId,
       this.id,
@@ -165,11 +172,16 @@ class MessageData {
       this.documentMessage,
       this.senderName,
       this.isEncrypted,
-      this.encryptionVersion});
+      this.encryptionVersion,
+      this.callId,
+      this.callType,
+      this.callStatus,
+      this.callDuration,
+      this.durationSeconds});
 
   MessageData.fromJson(Map<String, dynamic> json) {
-    id = json['id'];
-    userId = json['user_id'];
+    id = json['id'] is String ? int.tryParse(json['id']) : json['id'] as int?;
+    userId = json['user_id'] is String ? int.tryParse(json['user_id']) : json['user_id'] as int?;
     messageType = MessageType.fromString(json['message_type']);
     textMessage = json['text_message'];
     imageMessage = json['image_message'];
@@ -232,6 +244,13 @@ class MessageData {
     // W5: E2E encryption
     isEncrypted = json['is_encrypted'] == true;
     encryptionVersion = json['encryption_version'];
+
+    // Call log
+    callId = json['call_id'];
+    callType = json['call_type'];
+    callStatus = json['call_status'];
+    callDuration = json['call_duration'];
+    durationSeconds = json['duration_seconds'];
   }
 
   Map<String, dynamic> toJson() {
@@ -265,6 +284,11 @@ class MessageData {
     data['sender_name'] = senderName;
     data['is_encrypted'] = isEncrypted;
     data['encryption_version'] = encryptionVersion;
+    data['call_id'] = callId;
+    data['call_type'] = callType;
+    data['call_status'] = callStatus;
+    data['call_duration'] = callDuration;
+    data['duration_seconds'] = durationSeconds;
     return data;
   }
 
@@ -284,7 +308,8 @@ enum MessageType {
   audio('audio'),
   gif('gif'),
   storyReply('story_reply'),
-  document('document');
+  document('document'),
+  callLog('call_log');
 
   final String value;
 

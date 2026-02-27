@@ -54,11 +54,15 @@ class ChatSocketService {
     _socket?.emit(event, data);
   }
 
-  void on(String event, Function(dynamic) handler) {
+  void on(String event, dynamic Function(dynamic) handler) {
     _socket?.on(event, handler);
   }
 
-  void off(String event) {
-    _socket?.off(event);
+  void off(String event, [dynamic Function(dynamic)? handler]) {
+    if (handler != null) {
+      _socket?.off(event, handler);
+    } else {
+      _socket?.off(event);
+    }
   }
 }

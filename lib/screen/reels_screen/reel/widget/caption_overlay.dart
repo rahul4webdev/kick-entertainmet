@@ -2,15 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:shortzz/model/post_story/caption/caption_model.dart';
 import 'package:shortzz/utilities/text_style_custom.dart';
 import 'package:shortzz/utilities/theme_res.dart';
-import 'package:video_player/video_player.dart' hide Caption;
 
 class CaptionOverlay extends StatefulWidget {
-  final VideoPlayerController controller;
+  final ValueNotifier<int> videoPositionMs;
   final List<Caption> captions;
 
   const CaptionOverlay({
     super.key,
-    required this.controller,
+    required this.videoPositionMs,
     required this.captions,
   });
 
@@ -24,18 +23,18 @@ class _CaptionOverlayState extends State<CaptionOverlay> {
   @override
   void initState() {
     super.initState();
-    widget.controller.addListener(_onPositionChanged);
+    widget.videoPositionMs.addListener(_onPositionChanged);
   }
 
   @override
   void dispose() {
-    widget.controller.removeListener(_onPositionChanged);
+    widget.videoPositionMs.removeListener(_onPositionChanged);
     super.dispose();
   }
 
   void _onPositionChanged() {
     if (!mounted) return;
-    final posMs = widget.controller.value.position.inMilliseconds;
+    final posMs = widget.videoPositionMs.value;
     String text = '';
     for (final caption in widget.captions) {
       if (posMs >= caption.startMs && posMs <= caption.endMs) {

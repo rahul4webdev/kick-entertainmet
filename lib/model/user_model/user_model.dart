@@ -106,6 +106,9 @@ class User {
       this.isPrivate,
       this.isMonetized,
       this.monetizationStatus,
+      this.isApprovedSeller,
+      this.isApprovedAffiliate,
+      this.sellerWalletPaise,
       this.deviceBrand,
       this.deviceModel,
       this.deviceOs,
@@ -183,6 +186,9 @@ class User {
     bool? isPrivate,
     bool? isMonetized,
     int? monetizationStatus,
+    bool? isApprovedSeller,
+    bool? isApprovedAffiliate,
+    int? sellerWalletPaise,
     String? deviceBrand,
     String? deviceModel,
     String? deviceOs,
@@ -259,6 +265,9 @@ class User {
         isPrivate: isPrivate ?? this.isPrivate,
         isMonetized: isMonetized ?? this.isMonetized,
         monetizationStatus: monetizationStatus ?? this.monetizationStatus,
+        isApprovedSeller: isApprovedSeller ?? this.isApprovedSeller,
+        isApprovedAffiliate: isApprovedAffiliate ?? this.isApprovedAffiliate,
+        sellerWalletPaise: sellerWalletPaise ?? this.sellerWalletPaise,
         deviceBrand: deviceBrand ?? this.deviceBrand,
         deviceModel: deviceModel ?? this.deviceModel,
         deviceOs: deviceOs ?? this.deviceOs,
@@ -344,6 +353,9 @@ class User {
     isPrivate = json['is_private'] == 1 || json['is_private'] == true;
     isMonetized = json['is_monetized'] == 1 || json['is_monetized'] == true;
     monetizationStatus = _safeInt(json['monetization_status']);
+    isApprovedSeller = json['is_approved_seller'] == 1 || json['is_approved_seller'] == true;
+    isApprovedAffiliate = json['is_approved_affiliate'] == 1 || json['is_approved_affiliate'] == true;
+    sellerWalletPaise = _safeInt(json['seller_wallet_paise']);
     deviceBrand = json['device_brand'];
     deviceModel = json['device_model'];
     deviceOs = json['device_os'];
@@ -454,6 +466,9 @@ class User {
   bool? isPrivate;
   bool? isMonetized;
   int? monetizationStatus;
+  bool? isApprovedSeller;
+  bool? isApprovedAffiliate;
+  int? sellerWalletPaise;
   String? deviceBrand;
   String? deviceModel;
   String? deviceOs;
@@ -540,6 +555,9 @@ class User {
     map['is_private'] = isPrivate;
     map['is_monetized'] = isMonetized;
     map['monetization_status'] = monetizationStatus;
+    map['is_approved_seller'] = isApprovedSeller;
+    map['is_approved_affiliate'] = isApprovedAffiliate;
+    map['seller_wallet_paise'] = sellerWalletPaise;
     map['device_brand'] = deviceBrand;
     map['device_model'] = deviceModel;
     map['device_os'] = deviceOs;

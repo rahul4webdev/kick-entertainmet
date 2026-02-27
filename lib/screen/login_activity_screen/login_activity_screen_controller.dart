@@ -14,19 +14,23 @@ class LoginActivityScreenController extends BaseController {
 
   Future<void> _loadSessions() async {
     isDataLoading.value = true;
-    sessions.value = await UserService.instance.fetchLoginSessions();
+    try {
+      sessions.value = await UserService.instance.fetchLoginSessions();
+    } catch (_) {}
     isDataLoading.value = false;
   }
 
   Future<void> removeSession(int sessionId) async {
     showLoader();
-    final result = await UserService.instance.logOutSession(sessionId: sessionId);
-    stopLoader();
-    if (result.status == true) {
-      sessions.removeWhere((s) => s['id'] == sessionId);
+    try {
+      final result = await UserService.instance.logOutSession(sessionId: sessionId);
+      stopLoader();
+      if (result.status == true) {
+        sessions.removeWhere((s) => s['id'] == sessionId);
+      }
       showSnackBar(result.message);
-    } else {
-      showSnackBar(result.message);
+    } catch (_) {
+      stopLoader();
     }
   }
 

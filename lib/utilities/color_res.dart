@@ -16,7 +16,7 @@ class ColorRes {
   static const Color textStoryBgGradient2 = Color(0xFFFF5757);
   static const Color blueFollow = Color(0xFF3E8BFF);
   static const Color battleProgressColor = Color(0xFF2CC3FF);
-  static const Color bgLightGrey = Color(0xFFF9F9F9);
+  static const Color bgLightGrey = Color(0xFFF2F2F4);
   static const Color bgGrey = Color(0xFFF0F0F0);
   static const Color bgMediumGrey = Color(0xFFF5F5F5);
   static const Color disabledGrey = Color(0xFFC8C8C8);

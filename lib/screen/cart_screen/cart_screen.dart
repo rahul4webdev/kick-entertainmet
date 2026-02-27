@@ -93,18 +93,13 @@ class CartScreen extends StatelessWidget {
                       style: TextStyleCustom.outFitMedium500(
                           color: textDarkGrey(context), fontSize: 16),
                     ),
-                    Row(
-                      children: [
-                        Icon(Icons.monetization_on_outlined,
-                            size: 20, color: themeAccentSolid(context)),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${controller.totalCoins.value}',
-                          style: TextStyleCustom.unboundedSemiBold600(
-                              fontSize: 20,
-                              color: themeAccentSolid(context)),
-                        ),
-                      ],
+                    Text(
+                      controller.hasInrItems
+                          ? '₹${controller.totalRupees.toStringAsFixed(2)}'
+                          : '${controller.totalCoins.value} coins',
+                      style: TextStyleCustom.unboundedSemiBold600(
+                          fontSize: 20,
+                          color: themeAccentSolid(context)),
                     ),
                   ],
                 ),
@@ -166,6 +161,25 @@ class _CartItemRow extends StatelessWidget {
 
   const _CartItemRow({required this.item, required this.controller});
 
+  String _itemPrice(CartItem item) {
+    if ((item.variant?.pricePaise != null && item.variant!.pricePaise! > 0) ||
+        (item.product?.pricePaise != null && item.product!.pricePaise! > 0)) {
+      final paise = item.variant?.pricePaise ?? item.product?.pricePaise ?? 0;
+      final rupees = paise / 100.0;
+      return '₹${rupees.toStringAsFixed(rupees.truncateToDouble() == rupees ? 0 : 2)}';
+    }
+    return '${item.product?.priceCoins ?? 0} coins';
+  }
+
+  String _itemTotalDisplay(CartItem item) {
+    if ((item.variant?.pricePaise != null && item.variant!.pricePaise! > 0) ||
+        (item.product?.pricePaise != null && item.product!.pricePaise! > 0)) {
+      final r = item.itemTotalRupees;
+      return '₹${r.toStringAsFixed(r.truncateToDouble() == r ? 0 : 2)}';
+    }
+    return '${item.itemTotal}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final product = item.product;
@@ -224,18 +238,22 @@ class _CartItemRow extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (item.variant != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      [
+                        if (item.variant!.size != null) item.variant!.size,
+                        if (item.variant!.color != null) item.variant!.color,
+                      ].join(' / '),
+                      style: TextStyleCustom.outFitLight300(
+                          color: textLightGrey(context), fontSize: 11),
+                    ),
+                  ],
                   const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.monetization_on_outlined,
-                          size: 14, color: themeAccentSolid(context)),
-                      const SizedBox(width: 3),
-                      Text(
-                        '${product?.priceCoins ?? 0}',
-                        style: TextStyleCustom.outFitMedium500(
-                            color: themeAccentSolid(context), fontSize: 13),
-                      ),
-                    ],
+                  Text(
+                    _itemPrice(item),
+                    style: TextStyleCustom.outFitMedium500(
+                        color: themeAccentSolid(context), fontSize: 13),
                   ),
                   const SizedBox(height: 8),
                   // Quantity controls
@@ -263,7 +281,7 @@ class _CartItemRow extends StatelessWidget {
                       ),
                       const Spacer(),
                       Text(
-                        '${item.itemTotal}',
+                        _itemTotalDisplay(item),
                         style: TextStyleCustom.unboundedSemiBold600(
                             color: textDarkGrey(context), fontSize: 15),
                       ),

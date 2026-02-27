@@ -69,7 +69,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                       Container(
                         width: MediaQuery.of(context).size.width,
-                        constraints: const BoxConstraints(maxHeight: 200),
+                        constraints: const BoxConstraints(maxHeight: 260),
                         decoration: ShapeDecoration(
                           color: whitePure(context),
                           shape: SmoothRectangleBorder(
@@ -96,7 +96,7 @@ class HomeScreen extends StatelessWidget {
                                         children: [
                                           Expanded(
                                             child: Text(
-                                              tabType.title.toUpperCase(),
+                                              tabType.title,
                                               style: TextStyleCustom.unboundedBold700(
                                                   fontSize: 14,
                                                   color:
@@ -167,9 +167,9 @@ class _HomeTopBar extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          tab.title.toUpperCase(),
+                          tab.title,
                           style: TextStyleCustom.unboundedBold700(
-                            fontSize: isSelected ? 16 : 13,
+                            fontSize: 15,
                             color: isSelected ? whitePure(context) : whitePure(context).withValues(alpha: 0.5),
                           ),
                         ),

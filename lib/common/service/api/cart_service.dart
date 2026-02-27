@@ -18,6 +18,7 @@ class CartService {
 
   Future<CartActionModel> addToCart({
     required int productId,
+    int? variantId,
     int? quantity,
   }) async {
     CartActionModel response = await ApiService.instance.call(
@@ -25,6 +26,7 @@ class CartService {
       fromJson: CartActionModel.fromJson,
       param: {
         'product_id': productId,
+        'variant_id': variantId,
         'quantity': quantity ?? 1,
       },
     );

@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:get/get.dart';
+import 'package:http/http.dart' as http;
 import 'package:shortzz/common/controller/base_controller.dart';
 import 'package:shortzz/common/manager/logger.dart';
 import 'package:shortzz/common/manager/session_manager.dart' show SessionManager;
@@ -29,13 +30,50 @@ import 'package:shortzz/screen/reels_screen/reels_screen.dart';
 import 'package:shortzz/common/service/live/livestream_api_service.dart';
 import 'package:shortzz/utilities/const_res.dart';
 
+const String _chatQuickReplyUrl = 'http://168.231.123.230:3002/api/chat/quick-reply';
+const String _chatReplyActionId = 'reply';
+const String _chatCategoryId = 'chat_reply';
+
+/// Background isolate handler — called when user taps an action on a
+/// notification while the app is not in the foreground.
 @pragma('vm:entry-point')
-void notificationTapBackground(NotificationResponse notificationResponse) {
-  print('NOTIFICATION TAP ON BACKGROUND');
-  notificationResponse.data;
-  if (notificationResponse.payload != null) {
-    FirebaseNotificationManager.instance.handleNotification(notificationResponse.payload!);
+void notificationTapBackground(NotificationResponse notificationResponse) async {
+  // Quick reply: user typed a reply directly from the notification shade
+  if (notificationResponse.actionId == _chatReplyActionId &&
+      notificationResponse.input != null &&
+      notificationResponse.input!.trim().isNotEmpty) {
+    try {
+      final payload = notificationResponse.payload;
+      if (payload == null) return;
+
+      final msgMap = jsonDecode(payload) as Map<String, dynamic>;
+      final data = (msgMap['data'] as Map?)?.cast<String, dynamic>() ?? {};
+
+      final authToken = data['reply_auth_token'] as String? ?? '';
+      final conversationId = data['conversation_id'] as String? ?? '';
+      final replyText = notificationResponse.input!.trim();
+
+      if (authToken.isEmpty || conversationId.isEmpty) return;
+
+      await http.post(
+        Uri.parse(_chatQuickReplyUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'authtoken': authToken,
+        },
+        body: jsonEncode({
+          'conversation_id': conversationId,
+          'text': replyText,
+        }),
+      );
+    } catch (e) {
+      print('[QuickReply background] error: $e');
+    }
+    return;
   }
+
+  // Regular notification tap (not an action): navigation is handled by
+  // FirebaseMessaging.onMessageOpenedApp or getInitialMessage — nothing to do here.
 }
 
 class FirebaseNotificationManager {
@@ -49,13 +87,25 @@ class FirebaseNotificationManager {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
   RxString notificationPayload = ''.obs;
+
+  /// Channel for regular messages
   AndroidNotificationChannel channel = const AndroidNotificationChannel(
-      'shortzz', // id
-      'Shortzz', // title
+      'shortzz',
+      'Shortzz',
       playSound: true,
       enableLights: true,
       enableVibration: true,
       showBadge: false,
+      importance: Importance.max);
+
+  /// Channel for messages that support quick reply (needs HIGH importance)
+  AndroidNotificationChannel chatChannel = const AndroidNotificationChannel(
+      'shortzz_chat',
+      'Shortzz Messages',
+      playSound: true,
+      enableLights: true,
+      enableVibration: true,
+      showBadge: true,
       importance: Importance.max);
 
   String? notificationId;
@@ -76,34 +126,74 @@ class FirebaseNotificationManager {
 
     var initializationSettingsAndroid = const AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    var initializationSettingsIOS = const DarwinInitializationSettings(
-        defaultPresentAlert: true, defaultPresentSound: true, defaultPresentBadge: false);
+    // iOS: register notification category with text input action for quick reply
+    final chatCategory = DarwinNotificationCategory(
+      _chatCategoryId,
+      actions: [
+        DarwinNotificationAction.text(
+          _chatReplyActionId,
+          'Reply',
+          buttonTitle: 'Send',
+          placeholder: 'Message...',
+        ),
+      ],
+      options: {DarwinNotificationCategoryOption.hiddenPreviewShowTitle},
+    );
+
+    var initializationSettingsIOS = DarwinInitializationSettings(
+        defaultPresentAlert: true,
+        defaultPresentSound: true,
+        defaultPresentBadge: false,
+        notificationCategories: [chatCategory]);
 
     var initializationSettings = InitializationSettings(
         android: initializationSettingsAndroid, iOS: initializationSettingsIOS);
 
-    // Handling notification taps
     flutterLocalNotificationsPlugin.initialize(
         settings: initializationSettings,
         onDidReceiveNotificationResponse: (NotificationResponse response) {
-      print('onDidReceiveNotificationResponse ${response.payload}');
-      String? payload = response.payload;
-      if (payload != null) {
-        notificationPayload.value = payload;
-      }
-    }, onDidReceiveBackgroundNotificationResponse: notificationTapBackground);
+          print('onDidReceiveNotificationResponse actionId:${response.actionId} input:${response.input}');
 
+          // Quick reply in foreground — send via HTTP
+          if (response.actionId == _chatReplyActionId &&
+              response.input != null &&
+              response.input!.trim().isNotEmpty) {
+            _handleForegroundQuickReply(response);
+            return;
+          }
+
+          // Regular tap — navigate to the conversation
+          final payload = response.payload;
+          if (payload != null && payload.isNotEmpty) {
+            notificationPayload.value = payload;
+          }
+        },
+        onDidReceiveBackgroundNotificationResponse: notificationTapBackground);
+
+    // Watch notificationPayload — navigate whenever a local notification is tapped
+    ever(notificationPayload, (String payload) {
+      if (payload.isNotEmpty) {
+        handleNotification(payload);
+        // Reset so the same payload can trigger again if needed
+        Future.microtask(() => notificationPayload.value = '');
+      }
+    });
+
+    // Handle FCM notification when app is in the foreground
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      // If Notification has gone twice
       if (notificationId == message.messageId) return;
       notificationId = message.messageId;
 
-      String data = message.data['notification_data'] ?? '';
+      final data = message.data['notification_data'] ?? '';
 
       if (message.data['type'] == NotificationType.chat.type) {
-        ChatThread conversationUser = ChatThread.fromJson(jsonDecode(data));
-        if (conversationUser.conversationId == ChatScreenController.chatId) {
-          return;
+        if (data.isNotEmpty) {
+          try {
+            final conversationUser = ChatThread.fromJson(jsonDecode(data));
+            if (conversationUser.conversationId == ChatScreenController.chatId) {
+              return; // Already viewing this chat
+            }
+          } catch (_) {}
         }
       } else {
         SessionManager.instance.setNotifyCount(1);
@@ -111,17 +201,61 @@ class FirebaseNotificationManager {
       showNotification(message);
     });
 
+    // Handle notification tap when app comes from background
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       Loggers.info('User tapped the notification: ${message.data}');
-      print('FirebaseMessaging.onMessageOpenedApp');
       if (message.data.isNotEmpty) {
         handleNotification(jsonEncode(message.toMap()));
       }
     });
 
+    // Create Android notification channels
     await flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(channel);
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(chatChannel);
+
+    // Handle notification tap when app was fully terminated
+    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+      if (message != null && message.data.isNotEmpty) {
+        // Delay to let the app finish initializing before navigating
+        Future.delayed(const Duration(seconds: 2), () {
+          handleNotification(jsonEncode(message.toMap()));
+        });
+      }
+    });
+  }
+
+  void _handleForegroundQuickReply(NotificationResponse response) async {
+    try {
+      final payload = response.payload;
+      if (payload == null) return;
+
+      final msgMap = jsonDecode(payload) as Map<String, dynamic>;
+      final data = (msgMap['data'] as Map?)?.cast<String, dynamic>() ?? {};
+
+      final authToken = data['reply_auth_token'] as String? ?? '';
+      final conversationId = data['conversation_id'] as String? ?? '';
+      final replyText = response.input!.trim();
+
+      if (authToken.isEmpty || conversationId.isEmpty) return;
+
+      await http.post(
+        Uri.parse(_chatQuickReplyUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'authtoken': authToken,
+        },
+        body: jsonEncode({
+          'conversation_id': conversationId,
+          'text': replyText,
+        }),
+      );
+    } catch (e) {
+      Loggers.error('Quick reply foreground error: $e');
+    }
   }
 
   void unsubscribeToTopic({String? topic}) async {
@@ -149,16 +283,33 @@ class FirebaseNotificationManager {
 
   void showNotification(RemoteMessage message) {
     print('SHOW MESSAGE : ${message.toMap()}');
-    int notificationId = DateTime.now().millisecondsSinceEpoch.remainder(100000);
+    final id = DateTime.now().millisecondsSinceEpoch.remainder(100000);
+    final isChatNotification = message.data['type'] == NotificationType.chat.type;
 
     flutterLocalNotificationsPlugin.show(
-        id: notificationId,
+        id: id,
         title: (message.data['title']) ?? message.notification?.title,
         body: (message.data['body'] as String?) ?? message.notification?.body,
         notificationDetails: NotificationDetails(
-            iOS: const DarwinNotificationDetails(
-                presentSound: true, presentAlert: true, presentBadge: false),
-            android: AndroidNotificationDetails(channel.id, channel.name)),
+            iOS: DarwinNotificationDetails(
+                presentSound: true,
+                presentAlert: true,
+                presentBadge: false,
+                categoryIdentifier: isChatNotification ? _chatCategoryId : null),
+            android: AndroidNotificationDetails(
+              isChatNotification ? chatChannel.id : channel.id,
+              isChatNotification ? chatChannel.name : channel.name,
+              actions: isChatNotification
+                  ? [
+                      const AndroidNotificationAction(
+                        _chatReplyActionId,
+                        'Reply',
+                        showsUserInterface: false,
+                        inputs: [AndroidNotificationActionInput(label: 'Message...')],
+                      ),
+                    ]
+                  : null,
+            )),
         payload: jsonEncode(message.toMap()));
   }
 
@@ -251,7 +402,9 @@ class FirebaseNotificationManager {
 
   Future<String?> getNotificationToken() async {
     try {
-      String? token = await FirebaseMessaging.instance.getToken();
+      String? token = await FirebaseMessaging.instance
+          .getToken()
+          .timeout(const Duration(seconds: 5), onTimeout: () => null);
       Loggers.info('DeviceToken $token');
       return token;
     } catch (e) {
@@ -269,28 +422,23 @@ class FirebaseNotificationManager {
     required NotificationInfo body,
     required NotificationType type,
   }) async {
-    // Early return if no device token provided
     if ((deviceToken ?? '').isEmpty) {
       Loggers.error('Device Token Empty - Notification not sent for key: $key');
       return;
     }
 
-    // Get user data once
     final user = SessionManager.instance.getUser();
     final title = user?.fullname ?? '';
 
-    // Get translations efficiently
     final translations = Get.find<DynamicTranslations>();
     final languageData = translations.keys[languageCode] ?? {};
 
-    // Get description with fallback
     var description = languageData[key] ?? key;
 
     keyParams.forEach((key, value) {
       description = description.replaceAll('@$key', value);
     });
 
-    // Log relevant information
     Loggers.info('''
       [Notification Details]
       Language: $languageCode
@@ -301,7 +449,6 @@ class FirebaseNotificationManager {
       Device Token: $deviceToken
     ''');
 
-    // Send notification
     await NotificationService.instance.pushNotification(
         title: title,
         body: description,

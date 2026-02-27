@@ -40,52 +40,46 @@ class AuthScreenController extends BaseController {
     super.onInit();
   }
 
-  /// Login with email and password (custom backend auth).
+  /// Login with email or username + password.
   Future<void> onLogin() async {
-    final email = emailController.text.trim();
+    final input = emailController.text.trim();
     final password = passwordController.text.trim();
 
-    if (email.isEmpty) {
-      return showSnackBar(LKey.enterEmail.tr);
+    // --- Validation ---
+    if (input.isEmpty) {
+      return showSnackBar('Please enter your email or username.');
+    }
+    if (input.length < 3) {
+      return showSnackBar('Email or username must be at least 3 characters.');
+    }
+    // If it contains @, validate as email
+    if (input.contains('@') && !GetUtils.isEmail(input)) {
+      return showSnackBar('Please enter a valid email address.');
     }
     if (password.isEmpty) {
       return showSnackBar(LKey.enterAPassword.tr);
     }
+    if (password.length < 6) {
+      return showSnackBar('Password must be at least 6 characters.');
+    }
 
     showLoader();
 
-    String? deviceToken =
-        await FirebaseNotificationManager.instance.getNotificationToken();
-
-    if (deviceToken == null) {
-      stopLoader();
-      return showSnackBar('Unable to get device token. Please try again.');
+    String? deviceToken;
+    try {
+      deviceToken =
+          await FirebaseNotificationManager.instance.getNotificationToken();
+    } catch (e) {
+      debugPrint('[LOGIN] Failed to get device token: $e');
     }
+    deviceToken ??= 'no_token';
 
-    // Check if it's a dummy user login (non-email identity)
-    if (!GetUtils.isEmail(email)) {
-      // Legacy dummy user login
-      LoginResult loginResult = await UserService.instance.logInFakeUser(
-        identity: email,
-        loginMethod: LoginMethod.email,
-        deviceToken: deviceToken,
-        password: password,
-      );
-      stopLoader();
-      if (loginResult.requireTotp && loginResult.temp2faToken != null) {
-        Get.to(() => TwoFaVerifyScreen(tempToken: loginResult.temp2faToken!));
-        return;
-      }
-      if (loginResult.user != null) {
-        _navigateScreen(loginResult.user);
-      }
-      return;
-    }
+    // Normalize: lowercase (backend also normalizes, belt-and-suspenders)
+    final normalizedInput = input.toLowerCase();
 
-    // Custom auth: email + password login
     try {
       final result = await UserService.instance.loginWithEmail(
-        email: email,
+        email: normalizedInput,
         password: password,
         deviceToken: deviceToken,
       );
@@ -221,13 +215,14 @@ class AuthScreenController extends BaseController {
         return;
       }
 
-      String? deviceToken =
-          await FirebaseNotificationManager.instance.getNotificationToken();
-
-      if (deviceToken == null) {
-        stopLoader();
-        return showSnackBar('Unable to get device token. Please try again.');
+      String? deviceToken;
+      try {
+        deviceToken =
+            await FirebaseNotificationManager.instance.getNotificationToken();
+      } catch (e) {
+        debugPrint('[GOOGLE_LOGIN] Failed to get device token: $e');
       }
+      deviceToken ??= 'no_token';
 
       final result = await UserService.instance.loginWithGoogle(
         idToken: idToken,
@@ -281,13 +276,14 @@ class AuthScreenController extends BaseController {
                 .trim();
       }
 
-      String? deviceToken =
-          await FirebaseNotificationManager.instance.getNotificationToken();
-
-      if (deviceToken == null) {
-        stopLoader();
-        return showSnackBar('Unable to get device token. Please try again.');
+      String? deviceToken;
+      try {
+        deviceToken =
+            await FirebaseNotificationManager.instance.getNotificationToken();
+      } catch (e) {
+        debugPrint('[APPLE_LOGIN] Failed to get device token: $e');
       }
+      deviceToken ??= 'no_token';
 
       final result = await UserService.instance.loginWithApple(
         identityToken: appleCredential.identityToken!,
@@ -363,8 +359,9 @@ class AuthScreenController extends BaseController {
         try {
           await LocationService.instance.getCurrentLocation();
         } catch (_) {}
-        Get.offAll(() => DashboardScreen(myUser: data));
-        Get.to(() => const InterestSelectionScreen());
+        await Get.offAll(() => DashboardScreen(myUser: data));
+        await Future.delayed(const Duration(milliseconds: 300));
+        await Get.to(() => const InterestSelectionScreen());
       } else {
         Get.offAll(() => DashboardScreen(myUser: data));
       }

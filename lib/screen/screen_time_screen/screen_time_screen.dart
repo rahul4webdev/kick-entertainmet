@@ -337,10 +337,10 @@ class _BedtimeSection extends StatelessWidget {
                   ],
                 ),
               ),
-              Obx(() => CustomToggle(
-                    isOn: controller.bedtimeEnabled,
-                    onChanged: controller.toggleBedtime,
-                  )),
+              CustomToggle(
+                isOn: controller.bedtimeEnabled,
+                onChanged: controller.toggleBedtime,
+              ),
             ],
           ),
           Obx(() {

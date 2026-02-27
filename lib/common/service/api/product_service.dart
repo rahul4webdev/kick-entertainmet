@@ -1,3 +1,4 @@
+import 'package:image_picker/image_picker.dart';
 import 'package:shortzz/common/service/api/api_service.dart';
 import 'package:shortzz/common/service/utils/web_service.dart';
 import 'package:shortzz/model/general/status_model.dart';
@@ -52,23 +53,73 @@ class ProductService {
 
   Future<StatusModel> createProduct({
     required String name,
-    required int priceCoins,
+    int? priceCoins,
+    // Real money (INR) fields
+    int? pricePaise,
+    int? compareAtPricePaise,
+    int? shippingChargePaise,
+    double? gstRate,
+    String? hsnCode,
+    String? sku,
+    String? brandName,
+    int? weightGrams,
+    double? lengthCm,
+    double? breadthCm,
+    double? heightCm,
+    String? shippingType,
+    bool? codAvailable,
+    int? returnWindowDaysOverride,
+    String? pickupLocationName,
     String? description,
     int? categoryId,
     int? stock,
     bool? isDigital,
+    int? minOrderQty,
+    int? maxOrderQty,
+    // Variants as JSON string
+    String? variantsJson,
+    List<XFile?>? images,
   }) async {
+    final param = <String, dynamic>{
+      'name': name,
+      'price_coins': priceCoins,
+      'price_paise': pricePaise,
+      'compare_at_price_paise': compareAtPricePaise,
+      'shipping_charge_paise': shippingChargePaise,
+      'gst_rate': gstRate,
+      'hsn_code': hsnCode,
+      'sku': sku,
+      'brand_name': brandName,
+      'weight_grams': weightGrams,
+      'length_cm': lengthCm,
+      'breadth_cm': breadthCm,
+      'height_cm': heightCm,
+      'shipping_type': shippingType,
+      'cod_available': codAvailable == true ? 1 : null,
+      'return_window_days_override': returnWindowDaysOverride,
+      'pickup_location_name': pickupLocationName,
+      'description': description,
+      'category_id': categoryId,
+      'stock': stock ?? -1,
+      'is_digital': isDigital == true ? 1 : 0,
+      'min_order_qty': minOrderQty,
+      'max_order_qty': maxOrderQty,
+      'variants': variantsJson,
+    };
+
+    if (images != null && images.isNotEmpty) {
+      return await ApiService.instance.multiPartCallApi(
+        url: WebService.shop.createProduct,
+        fromJson: StatusModel.fromJson,
+        param: param,
+        filesMap: {'images[]': images},
+      );
+    }
+
     StatusModel response = await ApiService.instance.call(
       url: WebService.shop.createProduct,
       fromJson: StatusModel.fromJson,
-      param: {
-        'name': name,
-        'price_coins': priceCoins,
-        'description': description,
-        'category_id': categoryId,
-        'stock': stock ?? -1,
-        'is_digital': isDigital == true ? 1 : 0,
-      },
+      param: param,
     );
     return response;
   }
@@ -77,23 +128,71 @@ class ProductService {
     required int productId,
     String? name,
     int? priceCoins,
+    int? pricePaise,
+    int? compareAtPricePaise,
+    int? shippingChargePaise,
+    double? gstRate,
+    String? hsnCode,
+    String? sku,
+    String? brandName,
+    int? weightGrams,
+    double? lengthCm,
+    double? breadthCm,
+    double? heightCm,
+    String? shippingType,
+    bool? codAvailable,
+    int? returnWindowDaysOverride,
+    String? pickupLocationName,
     String? description,
     int? categoryId,
     int? stock,
     bool? isActive,
+    int? minOrderQty,
+    int? maxOrderQty,
+    String? variantsJson,
+    List<XFile?>? images,
   }) async {
+    final param = <String, dynamic>{
+      'product_id': productId,
+      'name': name,
+      'price_coins': priceCoins,
+      'price_paise': pricePaise,
+      'compare_at_price_paise': compareAtPricePaise,
+      'shipping_charge_paise': shippingChargePaise,
+      'gst_rate': gstRate,
+      'hsn_code': hsnCode,
+      'sku': sku,
+      'brand_name': brandName,
+      'weight_grams': weightGrams,
+      'length_cm': lengthCm,
+      'breadth_cm': breadthCm,
+      'height_cm': heightCm,
+      'shipping_type': shippingType,
+      'cod_available': codAvailable == true ? 1 : (codAvailable == false ? 0 : null),
+      'return_window_days_override': returnWindowDaysOverride,
+      'pickup_location_name': pickupLocationName,
+      'description': description,
+      'category_id': categoryId,
+      'stock': stock,
+      'is_active': isActive,
+      'min_order_qty': minOrderQty,
+      'max_order_qty': maxOrderQty,
+      'variants': variantsJson,
+    };
+
+    if (images != null && images.isNotEmpty) {
+      return await ApiService.instance.multiPartCallApi(
+        url: WebService.shop.updateProduct,
+        fromJson: StatusModel.fromJson,
+        param: param,
+        filesMap: {'images[]': images},
+      );
+    }
+
     StatusModel response = await ApiService.instance.call(
       url: WebService.shop.updateProduct,
       fromJson: StatusModel.fromJson,
-      param: {
-        'product_id': productId,
-        'name': name,
-        'price_coins': priceCoins,
-        'description': description,
-        'category_id': categoryId,
-        'stock': stock,
-        'is_active': isActive,
-      },
+      param: param,
     );
     return response;
   }

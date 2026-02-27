@@ -84,6 +84,8 @@ class LKey {
   static const String settings = "Settings";
   static const String openSettings = "Open Setting";
   static const String publish = "Publish";
+  static const String statistics = "Statistics";
+  static const String subscribe = "Subscribe";
   static const String website = "Website";
   static const String instagram = "Instagram";
   static const String youtube = "Youtube";
@@ -92,6 +94,9 @@ class LKey {
   static const String activity = "Activity";
   static const String system = "System";
   static const String story = "Story";
+  static const String viewStory = "View Story";
+  static const String viewProfilePicture = "View Profile Picture";
+  static const String addStory = "Add Story";
   static const String unFollow = "Unfollow";
   static const String goLive = "Go Live";
   static const String levels = "Levels";
@@ -1493,4 +1498,40 @@ class LKey {
   static const String addResponse = "Add Response";
   static const String typeYourResponse = "Type your response...";
   static const String additionalContext = "Additional context (optional)";
+
+  // Professional Dashboard & Settings Sections
+  static const String professionalDashboard = "Professional Dashboard";
+  static const String trackYourPerformance = "Track Your Performance";
+  static const String creatorDashboard = "Creator Dashboard";
+  static const String aiInsights = "AI Insights";
+  static const String contentCalendar = "Content Calendar";
+  static const String growYourBusiness = "Grow Your Business";
+  static const String subscriptionTiers = "Subscription Tiers";
+  static const String mySubscribers = "My Subscribers";
+  static const String myPortfolio = "My Portfolio";
+  static const String manageYourAccount = "Manage Your Account";
+  static const String creatorTier = "Creator Tier";
+  static const String accountTypeSettings = "Account Type Settings";
+  static const String mySubscriptions = "My Subscriptions";
+  static const String peopleSectionTitle = "People";
+  static const String contentAndFeed = "Content & Feed";
+  static const String digitalWellbeing = "Digital Wellbeing";
+  static const String aiAndDiscovery = "AI & Discovery";
+  static const String aiVideoGenerator = "AI Video Generator";
+  static const String moderatorPanel = "Moderator Panel";
+  static const String twoFactorAuth = "Two-Factor Authentication";
+  static const String switchAccount = "Switch Account";
+
+  // Business Account
+  static const String revertToPersonalDesc =
+      "Switching to a personal account will remove access to all professional tools including analytics, monetization, earnings dashboard, and team management.";
+  static const String switchToPersonal = "Switch to Personal";
+  static const String creatorLabel = "Creator";
+  static const String accountLabel2 = "Account";
+
+  // Series / Part Linking
+  static const String partOfSeries = "Part of a Series";
+  static const String selectPreviousPart = "Select Previous Part";
+  static const String previousPart = "Previous Part";
+  static const String nextPart = "Next Part";
 }

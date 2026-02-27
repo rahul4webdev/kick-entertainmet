@@ -128,7 +128,8 @@ enum TabType {
   discover,
   following,
   favorites,
-  nearby;
+  nearby,
+  news;
 
   String get title {
     switch (this) {
@@ -140,29 +141,25 @@ enum TabType {
         return LKey.favorites.tr;
       case TabType.nearby:
         return LKey.nearby.tr;
+      case TabType.news:
+        return 'News';
     }
   }
 }
 
 enum HomeTab {
   reels,
-  local,
   music,
-  trailers,
-  news;
+  trailers;
 
   String get title {
     switch (this) {
       case HomeTab.reels:
         return 'Reels';
-      case HomeTab.local:
-        return 'Local';
       case HomeTab.music:
         return 'Music';
       case HomeTab.trailers:
         return 'Trailers';
-      case HomeTab.news:
-        return 'News';
     }
   }
 
@@ -170,14 +167,10 @@ enum HomeTab {
     switch (this) {
       case HomeTab.reels:
         return 0;
-      case HomeTab.local:
-        return 0; // Uses same post type but filtered by location
       case HomeTab.music:
         return 1;
       case HomeTab.trailers:
         return 2;
-      case HomeTab.news:
-        return 3;
     }
   }
 }

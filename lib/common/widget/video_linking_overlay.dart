@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 import 'package:shortzz/common/manager/ads/ima_preroll_manager.dart';
 import 'package:shortzz/common/manager/session_manager.dart';
 import 'package:shortzz/common/service/api/post_service.dart';
 import 'package:shortzz/common/service/subscription/subscription_manager.dart';
 import 'package:shortzz/common/widget/ima_preroll_overlay.dart';
+import 'package:shortzz/languages/languages_keys.dart';
 import 'package:shortzz/model/post_story/post_model.dart';
 import 'package:shortzz/screen/content_screen/widget/content_reel_page.dart';
 
@@ -96,23 +98,23 @@ class _VideoLinkingOverlayState extends State<VideoLinkingOverlay> {
     return Stack(
       children: [
         Positioned(
-          right: 12,
-          bottom: 160,
-          child: Column(
+          left: 15,
+          bottom: 100,
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (_previousPost != null)
                 _PartButton(
                   icon: Icons.skip_previous_rounded,
-                  label: 'Prev Part',
+                  label: LKey.previousPart.tr,
                   onTap: () => _navigateTo(_previousPost!),
                 ),
               if (_previousPost != null && _nextPost != null)
-                const SizedBox(height: 8),
+                const SizedBox(width: 8),
               if (_nextPost != null)
                 _PartButton(
                   icon: Icons.skip_next_rounded,
-                  label: 'Next Part',
+                  label: LKey.nextPart.tr,
                   onTap: () => _navigateTo(_nextPost!),
                 ),
             ],
@@ -183,8 +185,6 @@ class LinkedPostPlayerScreen extends StatelessWidget {
       body: Stack(
         children: [
           ContentReelPage(post: post, autoPlay: true),
-          // The VideoLinkingOverlay is already inside ContentReelPage
-          // so chained navigation works automatically
           Positioned(
             top: MediaQuery.of(context).padding.top + 8,
             left: 8,

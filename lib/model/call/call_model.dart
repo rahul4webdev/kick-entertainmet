@@ -179,6 +179,7 @@ class IncomingCallData {
   String? callerProfile;
   int callType; // 1=voice, 2=video
   bool isGroup;
+  int? recipientId; // The other person's user ID (for call log)
 
   IncomingCallData({
     required this.callId,
@@ -189,6 +190,7 @@ class IncomingCallData {
     this.callerProfile,
     required this.callType,
     this.isGroup = false,
+    this.recipientId,
   });
 
   factory IncomingCallData.fromJson(Map<String, dynamic> json) {

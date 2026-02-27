@@ -34,6 +34,7 @@ class CallHelper {
       callerUsername: username,
       callerProfile: profilePhoto,
       callType: callType,
+      recipientId: userId,
     );
 
     Get.to(() => CallScreen(callData: callData, isOutgoing: true));

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shortzz/common/manager/ads/native_ad_manager.dart';
@@ -12,15 +14,28 @@ class NativeAdCard extends StatefulWidget {
 
 class _NativeAdCardState extends State<NativeAdCard> {
   NativeAd? _nativeAd;
+  Timer? _retryTimer;
 
   @override
   void initState() {
     super.initState();
     _nativeAd = NativeAdManager.instance.getAd();
+    if (_nativeAd == null) {
+      // Ads may still be loading; retry after a delay
+      _retryTimer = Timer(const Duration(seconds: 6), () {
+        if (mounted && _nativeAd == null) {
+          final ad = NativeAdManager.instance.getAd();
+          if (ad != null && mounted) {
+            setState(() => _nativeAd = ad);
+          }
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
+    _retryTimer?.cancel();
     _nativeAd?.dispose();
     super.dispose();
   }

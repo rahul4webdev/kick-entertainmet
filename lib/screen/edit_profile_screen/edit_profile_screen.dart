@@ -106,11 +106,42 @@ class EditProfileScreen extends StatelessWidget {
                     title: LKey.fullName.tr,
                   ),
                   Obx(() {
-                    return TextFieldCustom(
-                      controller: controller.usernameController,
-                      title: LKey.username.tr,
-                      onChanged: controller.checkUsernameAvailability,
-                      isError: !controller.isValidUserName.value,
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextFieldCustom(
+                          controller: controller.usernameController,
+                          title: LKey.username.tr,
+                          onChanged: controller.checkUsernameAvailability,
+                          isError: !controller.isValidUserName.value,
+                        ),
+                        if (controller.usernameStatus.value.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                                left: 20, right: 20, bottom: 8),
+                            child: Text(
+                              controller.usernameStatus.value == 'checking'
+                                  ? 'Checking...'
+                                  : controller.usernameStatus.value ==
+                                          'available'
+                                      ? 'Username available'
+                                      : controller.usernameStatus.value ==
+                                              'taken'
+                                          ? 'Username already taken'
+                                          : 'Invalid username',
+                              style: TextStyleCustom.outFitLight300(
+                                fontSize: 13,
+                                color: controller.usernameStatus.value ==
+                                        'available'
+                                    ? Colors.green
+                                    : controller.usernameStatus.value ==
+                                            'checking'
+                                        ? textLightGrey(context)
+                                        : Colors.red,
+                              ),
+                            ),
+                          ),
+                      ],
                     );
                   }),
                   TextFieldCustom(

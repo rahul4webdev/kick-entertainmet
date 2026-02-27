@@ -90,57 +90,67 @@ class SelectLanguageScreen extends StatelessWidget {
                       iconColor: whitePure(context)),
                 },
                 Expanded(
-                  child: ListView.builder(
+                  child: Obx(() => GridView.builder(
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: 2,
+                        mainAxisSpacing: 6,
+                        crossAxisSpacing: 6,
+                        childAspectRatio: 2.4,
+                      ),
                       itemCount: controller.languages.length,
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 15, vertical: 25),
+                          horizontal: 15, vertical: 20),
                       itemBuilder: (context, index) {
                         Language language = controller.languages[index];
-                        return Obx(
-                          () {
-                            bool isSelected =
-                                language == controller.selectedLanguage.value;
-                            return RadioGroup<Language?>(
-                              groupValue: controller.selectedLanguage.value,
-                              onChanged: controller.onLanguageChange,
-                              child: Container(
-                                height: 60,
-                                alignment: Alignment.center,
-                                margin: const EdgeInsets.symmetric(vertical: 2),
-                                decoration: ShapeDecoration(
-                                  shape: SmoothRectangleBorder(
-                                    borderRadius: SmoothBorderRadius(cornerRadius: 10, cornerSmoothing: 1),
-                                    side: isSelected
-                                        ? BorderSide(color: whitePure(context))
-                                        : const BorderSide(color: Colors.transparent),
-                                  ),
-                                  color: whitePure(context).withValues(alpha: isSelected ? .3 : .1),
-                                ),
-                                child: RadioListTile<Language?>(
-                                    value: language,
-                                    activeColor: whitePure(context),
-                                    fillColor: WidgetStatePropertyAll(whitePure(context)),
-                                    splashRadius: 0,
-                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    dense: true,
-                                    visualDensity: const VisualDensity(
-                                      horizontal: VisualDensity.minimumDensity,
-                                      vertical: VisualDensity.minimumDensity,
-                                    ),
-                                    contentPadding: EdgeInsets.zero,
-                                    title: Text(
-                                      language.localizedTitle ?? '',
-                                      style: TextStyleCustom.outFitLight300(fontSize: 15, color: whitePure(context)),
-                                    ),
-                                    subtitle: Text(
-                                      language.title ?? '',
-                                      style: TextStyleCustom.outFitMedium500(fontSize: 17, color: whitePure(context)),
-                                    )),
+                        bool isSelected =
+                            language == controller.selectedLanguage.value;
+                        return GestureDetector(
+                          onTap: () =>
+                              controller.onLanguageChange(language),
+                          child: Container(
+                            alignment: Alignment.center,
+                            decoration: ShapeDecoration(
+                              shape: SmoothRectangleBorder(
+                                borderRadius: SmoothBorderRadius(
+                                    cornerRadius: 12, cornerSmoothing: 1),
+                                side: isSelected
+                                    ? BorderSide(
+                                        color: whitePure(context), width: 1.5)
+                                    : const BorderSide(
+                                        color: Colors.transparent),
                               ),
-                            );
-                          },
+                              color: whitePure(context)
+                                  .withValues(alpha: isSelected ? .3 : .1),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  language.title ?? '',
+                                  style: TextStyleCustom.outFitMedium500(
+                                      fontSize: 15,
+                                      color: whitePure(context)),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  language.localizedTitle ?? '',
+                                  style: TextStyleCustom.outFitLight300(
+                                      fontSize: 12,
+                                      color: whitePure(context)
+                                          .withValues(alpha: 0.6)),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
                         );
-                      }),
+                      })),
                 ),
                 if (languageNavigationType == LanguageNavigationType.fromStart)
                   TextButtonCustom(

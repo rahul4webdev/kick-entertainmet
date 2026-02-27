@@ -9,16 +9,42 @@ import 'package:shortzz/screen/chat_screen/widget/chat_top_profile_view.dart';
 import 'package:shortzz/utilities/text_style_custom.dart';
 import 'package:shortzz/utilities/theme_res.dart';
 
-class ChatScreen extends StatelessWidget {
+class ChatScreen extends StatefulWidget {
   final ChatThread conversationUser;
   final User? user;
 
   const ChatScreen({super.key, required this.conversationUser, this.user});
 
   @override
+  State<ChatScreen> createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends State<ChatScreen> {
+  late ChatScreenController controller;
+
+  @override
+  void initState() {
+    super.initState();
+    final tag = '${widget.conversationUser.conversationId}';
+    // Always delete any cached controller so we get a fresh one with the
+    // correct chatType (request vs approved). Without this, GetX may return
+    // a stale controller from a previous visit where chatType was 'approved',
+    // causing the request accept/reject/block buttons to not appear.
+    if (Get.isRegistered<ChatScreenController>(tag: tag)) {
+      Get.delete<ChatScreenController>(tag: tag, force: true);
+    }
+    controller = Get.put(ChatScreenController(widget.conversationUser.obs), tag: tag);
+  }
+
+  @override
+  void dispose() {
+    final tag = '${widget.conversationUser.conversationId}';
+    Get.delete<ChatScreenController>(tag: tag, force: true);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final controller = Get.put(ChatScreenController(conversationUser.obs),
-        tag: '${conversationUser.conversationId}');
     return Obx(() {
       final vanish = controller.isVanishMode.value;
       return Scaffold(

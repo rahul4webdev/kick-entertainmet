@@ -20,11 +20,7 @@ import 'package:shortzz/screen/qr_code_screen/qr_code_screen.dart';
 import 'package:shortzz/screen/saved_post_screen/saved_post_screen.dart';
 import 'package:shortzz/screen/select_language_screen/select_language_screen.dart';
 import 'package:shortzz/screen/business_account_screen/business_account_screen.dart';
-import 'package:shortzz/screen/earnings_dashboard_screen/earnings_dashboard_screen.dart';
 import 'package:shortzz/screen/follow_request_screen/follow_request_screen.dart';
-import 'package:shortzz/screen/monetization_screen/monetization_screen.dart';
-import 'package:shortzz/screen/creator_dashboard_screen/creator_dashboard_screen.dart';
-import 'package:shortzz/screen/tier_status_screen/tier_status_screen.dart';
 import 'package:shortzz/screen/instagram_import_screen/instagram_import_screen.dart';
 import 'package:shortzz/screen/moderator_panel_screen/moderator_panel_screen.dart';
 import 'package:shortzz/screen/trending_hashtags_screen/trending_hashtags_screen.dart';
@@ -37,25 +33,16 @@ import 'package:shortzz/screen/settings_screen/settings_screen_controller.dart';
 import 'package:shortzz/screen/settings_screen/widget/notifications_page.dart';
 import 'package:shortzz/screen/settings_screen/widget/setting_icon_text_with_arrow.dart';
 import 'package:shortzz/screen/subscription_screen/subscription_screen.dart';
-import 'package:shortzz/screen/subscription_screen/manage_tiers_screen.dart';
 import 'package:shortzz/screen/subscription_screen/my_subscriptions_screen.dart';
-import 'package:shortzz/screen/subscription_screen/my_subscribers_screen.dart';
-import 'package:shortzz/screen/paid_series_screen/paid_series_screen.dart';
-import 'package:shortzz/screen/ad_revenue_screen/ad_revenue_screen.dart';
-import 'package:shortzz/screen/shop_screen/shop_screen.dart';
-import 'package:shortzz/screen/affiliate_screen/affiliate_screen.dart';
-import 'package:shortzz/screen/team_screen/team_screen.dart';
 import 'package:shortzz/screen/parental_control_screen/parental_control_screen.dart';
 import 'package:shortzz/screen/wellbeing_screen/wellbeing_screen.dart';
-import 'package:shortzz/screen/marketplace_screen/marketplace_screen.dart';
 import 'package:shortzz/screen/term_and_privacy_screen/term_and_privacy_screen.dart';
 import 'package:shortzz/screen/two_fa_screen/two_fa_setup_screen.dart';
 import 'package:shortzz/screen/two_fa_screen/two_fa_disable_sheet.dart';
 import 'package:shortzz/screen/ai_content_ideas_screen/ai_content_ideas_screen.dart';
 import 'package:shortzz/screen/ai_video_screen/ai_video_screen.dart';
-import 'package:shortzz/screen/bank_accounts_screen/bank_accounts_screen.dart';
 import 'package:shortzz/screen/account_switcher_sheet/account_switcher_sheet.dart';
-import 'package:shortzz/screen/portfolio_screen/portfolio_screen.dart';
+import 'package:shortzz/screen/professional_dashboard_screen/professional_dashboard_screen.dart';
 import 'package:shortzz/screen/login_activity_screen/login_activity_screen.dart';
 import 'package:shortzz/screen/data_download_screen/data_download_screen.dart';
 import 'package:shortzz/screen/grievance_screen/grievance_screen.dart';
@@ -86,12 +73,40 @@ class SettingsScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Subscription Card
+                  // Subscription Card (Become Plus)
                   SubscriptionCard(controller: controller, onUpdateUser: onUpdateUser),
 
-                  // --- YOUR ACCOUNT ---
-                  SettingSection(
+                  // --- PROFESSIONAL TOOLS (right after Plus) ---
+                  Obx(() {
+                    int accountType = controller.myUser.value?.accountType ?? 0;
+                    if (accountType > 0) {
+                      return SettingSection(
+                        children: [
+                          SettingIconTextWithArrow(
+                            iconData: Icons.dashboard_customize_outlined,
+                            title: LKey.professionalDashboard,
+                            iconBgColor: Colors.deepPurple.withValues(alpha: 0.08),
+                            iconColor: Colors.deepPurple,
+                            onTap: () => Get.to(() => const ProfessionalDashboardScreen()),
+                          ),
+                        ],
+                      );
+                    }
+                    return SettingSection(
+                      children: [
+                        SettingIconTextWithArrow(
+                          iconData: Icons.storefront_outlined,
+                          title: LKey.switchToBusinessAccount,
+                          onTap: () => Get.to(() => const BusinessAccountScreen()),
+                        ),
+                      ],
+                    );
+                  }),
+
+                  // --- PERSONAL (accordion) ---
+                  AccordionSettingSection(
                     title: LKey.personal,
+                    icon: Icons.person_outline_rounded,
                     children: [
                       SettingIconTextWithArrow(
                         iconData: Icons.person_outline_rounded,
@@ -118,12 +133,18 @@ class SettingsScreen extends StatelessWidget {
                         title: LKey.coinWallet,
                         onTap: () => Get.to(() => const CoinWalletScreen()),
                       ),
+                      SettingIconTextWithArrow(
+                        iconData: Icons.subscriptions_outlined,
+                        title: LKey.mySubscriptions,
+                        onTap: () => Get.to(() => const MySubscriptionsScreen()),
+                      ),
                     ],
                   ),
 
-                  // --- PEOPLE ---
-                  SettingSection(
-                    title: 'People',
+                  // --- PEOPLE (accordion) ---
+                  AccordionSettingSection(
+                    title: LKey.peopleSectionTitle,
+                    icon: Icons.people_outline_rounded,
                     children: [
                       SettingIconTextWithArrow(
                         iconData: Icons.block_rounded,
@@ -174,9 +195,10 @@ class SettingsScreen extends StatelessWidget {
                     ],
                   ),
 
-                  // --- CONTENT & FEED ---
-                  SettingSection(
-                    title: 'Content & Feed',
+                  // --- CONTENT & FEED (accordion) ---
+                  AccordionSettingSection(
+                    title: LKey.contentAndFeed,
+                    icon: Icons.tune_rounded,
                     children: [
                       SettingIconTextWithArrow(
                         iconData: Icons.interests_outlined,
@@ -211,9 +233,10 @@ class SettingsScreen extends StatelessWidget {
                     ],
                   ),
 
-                  // --- DIGITAL WELLBEING ---
-                  SettingSection(
-                    title: 'Digital Wellbeing',
+                  // --- DIGITAL WELLBEING (accordion) ---
+                  AccordionSettingSection(
+                    title: LKey.digitalWellbeing,
+                    icon: Icons.spa_outlined,
                     children: [
                       SettingIconTextWithArrow(
                         iconData: Icons.hourglass_empty_rounded,
@@ -242,123 +265,14 @@ class SettingsScreen extends StatelessWidget {
                     ],
                   ),
 
-                  // --- CREATOR TOOLS ---
-                  SettingSection(
-                    title: 'Creator Tools',
-                    children: [
-                      SettingIconTextWithArrow(
-                        iconData: Icons.dashboard_outlined,
-                        title: 'Creator Dashboard',
-                        iconBgColor: Colors.deepPurple.withValues(alpha: 0.08),
-                        iconColor: Colors.deepPurple,
-                        onTap: () => Get.to(() => const CreatorDashboardScreen()),
-                      ),
-                      SettingIconTextWithArrow(
-                        iconData: Icons.work_outline_rounded,
-                        title: 'My Portfolio',
-                        onTap: () => Get.to(() => const PortfolioScreen()),
-                      ),
-                      Obx(() {
-                        int accountType = controller.myUser.value?.accountType ?? 0;
-                        return SettingIconTextWithArrow(
-                          iconData: Icons.storefront_outlined,
-                          title: accountType == 0 ? LKey.switchToBusinessAccount : LKey.businessAccountStatus,
-                          onTap: () => Get.to(() => const BusinessAccountScreen()),
-                        );
-                      }),
-                      Obx(() {
-                        int accountType = controller.myUser.value?.accountType ?? 0;
-                        if (accountType > 0) {
-                          return SettingIconTextWithArrow(
-                            iconData: Icons.monetization_on_outlined,
-                            title: LKey.monetization,
-                            iconBgColor: Colors.green.withValues(alpha: 0.08),
-                            iconColor: Colors.green.shade700,
-                            onTap: () => Get.to(() => const MonetizationScreen()),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      }),
-                      Obx(() {
-                        if (controller.myUser.value?.isMonetized == true) {
-                          return SettingIconTextWithArrow(
-                            iconData: Icons.trending_up_rounded,
-                            title: LKey.creatorEarnings,
-                            onTap: () => Get.to(() => const EarningsDashboardScreen()),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      }),
-                      SettingIconTextWithArrow(
-                        iconData: Icons.account_balance_outlined,
-                        title: LKey.bankAccounts,
-                        onTap: () => Get.to(() => const BankAccountsScreen()),
-                      ),
-                      SettingIconTextWithArrow(
-                        iconData: Icons.military_tech_outlined,
-                        title: 'Creator Tier',
-                        onTap: () => Get.to(() => const TierStatusScreen()),
-                      ),
-                      SettingIconTextWithArrow(
-                        iconData: Icons.card_membership_outlined,
-                        title: 'Subscription Tiers',
-                        onTap: () => Get.to(() => const ManageTiersScreen()),
-                      ),
-                      SettingIconTextWithArrow(
-                        iconData: Icons.subscriptions_outlined,
-                        title: 'My Subscriptions',
-                        onTap: () => Get.to(() => const MySubscriptionsScreen()),
-                      ),
-                      Obx(() {
-                        if (controller.myUser.value?.subscriptionsEnabled == true) {
-                          return SettingIconTextWithArrow(
-                            iconData: Icons.people_outline_rounded,
-                            title: 'My Subscribers',
-                            onTap: () => Get.to(() => const MySubscribersScreen()),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      }),
-                      SettingIconTextWithArrow(
-                        iconData: Icons.video_library_outlined,
-                        title: LKey.paidSeries,
-                        onTap: () => Get.to(() => const PaidSeriesScreen()),
-                      ),
-                      SettingIconTextWithArrow(
-                        iconData: Icons.attach_money_rounded,
-                        title: LKey.adRevenueShare,
-                        onTap: () => Get.to(() => const AdRevenueScreen()),
-                      ),
-                      SettingIconTextWithArrow(
-                        iconData: Icons.shopping_bag_outlined,
-                        title: LKey.shop,
-                        onTap: () => Get.to(() => const ShopScreen()),
-                      ),
-                      SettingIconTextWithArrow(
-                        iconData: Icons.store_outlined,
-                        title: LKey.creatorMarketplace,
-                        onTap: () => Get.to(() => const MarketplaceScreen()),
-                      ),
-                      SettingIconTextWithArrow(
-                        iconData: Icons.link_rounded,
-                        title: LKey.affiliateProgram,
-                        onTap: () => Get.to(() => const AffiliateScreen()),
-                      ),
-                      SettingIconTextWithArrow(
-                        iconData: Icons.groups_outlined,
-                        title: LKey.teamManagement,
-                        onTap: () => Get.to(() => const TeamScreen()),
-                      ),
-                    ],
-                  ),
-
-                  // --- AI & DISCOVERY ---
-                  SettingSection(
-                    title: 'AI & Discovery',
+                  // --- AI & DISCOVERY (accordion) ---
+                  AccordionSettingSection(
+                    title: LKey.aiAndDiscovery,
+                    icon: Icons.auto_awesome_outlined,
                     children: [
                       SettingIconTextWithArrow(
                         iconData: Icons.trending_up_rounded,
-                        title: 'Trending',
+                        title: LKey.trending,
                         iconBgColor: Colors.orange.withValues(alpha: 0.08),
                         iconColor: Colors.orange.shade700,
                         onTap: () => Get.to(() => const TrendingHashtagsScreen()),
@@ -372,7 +286,7 @@ class SettingsScreen extends StatelessWidget {
                       ),
                       SettingIconTextWithArrow(
                         iconData: Icons.auto_awesome_outlined,
-                        title: 'AI Video Generator',
+                        title: LKey.aiVideoGenerator,
                         iconBgColor: Colors.indigo.withValues(alpha: 0.08),
                         iconColor: Colors.indigo,
                         onTap: () => Get.to(() => const AiVideoScreen()),
@@ -381,7 +295,7 @@ class SettingsScreen extends StatelessWidget {
                         if (controller.myUser.value?.isModerator == 1) {
                           return SettingIconTextWithArrow(
                             iconData: Icons.admin_panel_settings_outlined,
-                            title: 'Moderator Panel',
+                            title: LKey.moderatorPanel,
                             iconBgColor: Colors.red.withValues(alpha: 0.08),
                             iconColor: Colors.red.shade600,
                             onTap: () => Get.to(() => const ModeratorPanelScreen()),
@@ -401,9 +315,10 @@ class SettingsScreen extends StatelessWidget {
                     ],
                   ),
 
-                  // --- PRIVACY & SECURITY ---
-                  SettingSection(
+                  // --- PRIVACY & SECURITY (accordion) ---
+                  AccordionSettingSection(
                     title: LKey.privacy,
+                    icon: Icons.lock_outline_rounded,
                     children: [
                       Obx(
                         () => SettingIconTextWithArrow(
@@ -475,7 +390,7 @@ class SettingsScreen extends StatelessWidget {
                       ),
                       SettingIconTextWithArrow(
                         iconData: Icons.security_rounded,
-                        title: 'Two-Factor Authentication',
+                        title: LKey.twoFactorAuth,
                         onTap: () {
                           final user = controller.myUser.value;
                           if (user?.twoFaEnabled == true) {
@@ -507,9 +422,10 @@ class SettingsScreen extends StatelessWidget {
                     ],
                   ),
 
-                  // --- SUPPORT & ABOUT ---
-                  SettingSection(
+                  // --- GENERAL (accordion) ---
+                  AccordionSettingSection(
                     title: LKey.general,
+                    icon: Icons.settings_outlined,
                     children: [
                       SettingIconTextWithArrow(
                         iconData: Icons.description_outlined,
@@ -534,12 +450,12 @@ class SettingsScreen extends StatelessWidget {
                     ],
                   ),
 
-                  // --- ACCOUNT ---
+                  // --- ACCOUNT ACTIONS (not accordion) ---
                   SettingSection(
                     children: [
                       SettingIconTextWithArrow(
                         iconData: Icons.swap_horiz_rounded,
-                        title: 'Switch Account',
+                        title: LKey.switchAccount,
                         onTap: () => Get.bottomSheet(const AccountSwitcherSheet()),
                       ),
                       SettingIconTextWithArrow(

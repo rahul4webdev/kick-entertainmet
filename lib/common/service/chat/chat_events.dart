@@ -121,4 +121,7 @@ class ChatEvents {
   static const cCallCreate = 'c:call_create';
   static const cCallUpdateStatus = 'c:call_update_status';
   static const sCallStatusChanged = 's:call_status_changed';
+
+  // Call Log
+  static const cCreateCallLog = 'c:create_call_log';
 }

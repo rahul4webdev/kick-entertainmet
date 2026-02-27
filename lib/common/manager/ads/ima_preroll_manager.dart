@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shortzz/common/manager/ads/vast/vast_ad_preloader.dart';
 import 'package:shortzz/common/manager/session_manager.dart';
 import 'package:shortzz/common/service/subscription/subscription_manager.dart';
+import 'package:shortzz/utilities/const_res.dart';
 
 enum ImaAdPlacement { preRoll, midRoll, postRoll }
 
@@ -95,31 +96,47 @@ class ImaAdManager {
   int get preloadSecondsBefore =>
       SessionManager.instance.getSettings()?.imaPreloadSecondsBefore ?? 10;
 
-  /// Get VAST feed ad tag URL for current platform.
+  /// Get VAST feed ad tag URL — routes through backend proxy to avoid
+  /// direct connections to doubleclick.net which may be blocked on some networks.
   String? get vastFeedAdTagUrl {
+    final settings = SessionManager.instance.getSettings();
+    if (settings?.vastFeedAdEnabled != true) return null;
+    final platform = Platform.isIOS ? 'ios' : 'android';
+    return '${apiURL}vast/fetch?tag=infeed&platform=$platform';
+  }
+
+  String? getAdTagUrl(ImaAdPlacement placement) {
+    final platform = Platform.isIOS ? 'ios' : 'android';
+    final tag = switch (placement) {
+      ImaAdPlacement.preRoll => 'instream',
+      ImaAdPlacement.midRoll => 'midroll',
+      ImaAdPlacement.postRoll => 'postroll',
+    };
+    return '${apiURL}vast/fetch?tag=$tag&platform=$platform';
+  }
+
+  /// Direct ad tag URL from settings — used by the native IMA SDK.
+  /// The native IMA SDK uses Android/iOS HTTP (reaches doubleclick.net fine)
+  /// and automatically sends GAID + app bundle signals for AdMob demand fill.
+  String? getDirectAdTagUrl(ImaAdPlacement placement) {
+    final setting = SessionManager.instance.getSettings();
+    switch (placement) {
+      case ImaAdPlacement.preRoll:
+        return Platform.isAndroid ? setting?.imaAdTagAndroid : setting?.imaAdTagIos;
+      case ImaAdPlacement.midRoll:
+        return Platform.isAndroid ? setting?.imaMidRollAdTagAndroid : setting?.imaMidRollAdTagIos;
+      case ImaAdPlacement.postRoll:
+        return Platform.isAndroid ? setting?.imaPostRollAdTagAndroid : setting?.imaPostRollAdTagIos;
+    }
+  }
+
+  /// Direct feed ad tag URL from settings — used by native IMA SDK.
+  String? get directFeedAdTagUrl {
     final settings = SessionManager.instance.getSettings();
     if (settings?.vastFeedAdEnabled != true) return null;
     return Platform.isAndroid
         ? settings?.vastFeedAdTagAndroid
         : settings?.vastFeedAdTagIos;
-  }
-
-  String? getAdTagUrl(ImaAdPlacement placement) {
-    final setting = SessionManager.instance.getSettings();
-    switch (placement) {
-      case ImaAdPlacement.preRoll:
-        return Platform.isAndroid
-            ? setting?.imaAdTagAndroid
-            : setting?.imaAdTagIos;
-      case ImaAdPlacement.midRoll:
-        return Platform.isAndroid
-            ? setting?.imaMidRollAdTagAndroid
-            : setting?.imaMidRollAdTagIos;
-      case ImaAdPlacement.postRoll:
-        return Platform.isAndroid
-            ? setting?.imaPostRollAdTagAndroid
-            : setting?.imaPostRollAdTagIos;
-    }
   }
 
   /// Start preloading an ad for the given placement.

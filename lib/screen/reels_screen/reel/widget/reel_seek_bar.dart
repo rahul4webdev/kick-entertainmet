@@ -1,19 +1,22 @@
+import 'dart:async';
+
 import 'package:figma_squircle_updated/figma_squircle.dart';
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 import 'package:shortzz/common/extensions/duration_extension.dart';
 import 'package:shortzz/common/extensions/string_extension.dart';
 import 'package:shortzz/screen/dashboard_screen/dashboard_screen_controller.dart';
 import 'package:shortzz/screen/reels_screen/reel/reel_page_controller.dart';
 import 'package:shortzz/utilities/text_style_custom.dart';
 import 'package:shortzz/utilities/theme_res.dart';
-import 'package:video_player/video_player.dart';
 
 class ReelSeekBar extends StatefulWidget {
-  final VideoPlayerController? videoController;
+  final Player? player;
   final ReelController controller;
 
-  const ReelSeekBar({super.key, required this.videoController, required this.controller});
+  const ReelSeekBar({super.key, required this.player, required this.controller});
 
   @override
   State<ReelSeekBar> createState() => _ReelSeekBarState();
@@ -21,51 +24,54 @@ class ReelSeekBar extends StatefulWidget {
 
 class _ReelSeekBarState extends State<ReelSeekBar> {
   late final GlobalKey sliderKey = GlobalKey();
-  late final VideoPlayerController? _mainController = widget.videoController;
-  VideoPlayerController? _overlayController;
+  Player? _overlayPlayer;
+  VideoController? _overlayVideoController;
 
   OverlayEntry? _overlayEntry;
   final ValueNotifier<Offset?> _overlayOffsetNotifier = ValueNotifier(null);
   Duration _currentPosition = Duration.zero;
+  Duration _totalDuration = Duration.zero;
   bool _isOverlayInitialized = false;
   bool _isOverlayVisible = false;
+  StreamSubscription? _positionSub;
+  StreamSubscription? _overlayPositionSub;
 
   final dashboardController = Get.find<DashboardScreenController>();
 
   @override
   void initState() {
     super.initState();
-    _mainController?.addListener(_updateMainPosition);
-  }
-
-  void _updateMainPosition() async {
-    final pos = await _mainController?.position;
-    if (pos != null && mounted) {
-      setState(() => _currentPosition = pos);
+    _positionSub = widget.player?.stream.position.listen((pos) {
+      if (mounted) setState(() => _currentPosition = pos);
+    });
+    // Also listen to duration changes
+    final dur = widget.player?.state.duration;
+    if (dur != null && dur.inMicroseconds > 0) {
+      _totalDuration = dur;
     }
+    widget.player?.stream.duration.listen((dur) {
+      if (mounted && dur.inMicroseconds > 0) {
+        setState(() => _totalDuration = dur);
+      }
+    });
   }
 
   void _removeOverlay() {
     _overlayEntry?.remove();
     _overlayEntry?.dispose();
     _overlayEntry = null;
-    _isOverlayVisible = false; // 👈 reset here
+    _isOverlayVisible = false;
 
-    if (_isOverlayInitialized && _overlayController != null) {
-      _overlayController!.removeListener(_updateOverlayPosition);
-      _overlayController!.dispose();
-      _overlayController = null;
+    if (_isOverlayInitialized && _overlayPlayer != null) {
+      _overlayPositionSub?.cancel();
+      _overlayPositionSub = null;
+      _overlayPlayer!.dispose();
+      _overlayPlayer = null;
+      _overlayVideoController = null;
       _isOverlayInitialized = false;
     }
 
     _overlayOffsetNotifier.value = null;
-  }
-
-  void _updateOverlayPosition() async {
-    final pos = await _overlayController?.position;
-    if (pos != null && mounted) {
-      setState(() => _currentPosition = pos);
-    }
   }
 
   void _updateOverlayLocation(Offset globalOffset) {
@@ -73,7 +79,7 @@ class _ReelSeekBarState extends State<ReelSeekBar> {
   }
 
   Future<void> _createOverlay() async {
-    if (_isOverlayVisible) return; // 👈 Prevent duplicate overlays
+    if (_isOverlayVisible) return;
 
     _isOverlayVisible = true;
     _removeOverlay();
@@ -81,16 +87,28 @@ class _ReelSeekBarState extends State<ReelSeekBar> {
     String url = widget.controller.reelData.value.video?.addBaseURL() ?? '';
     if (url.isEmpty) return;
 
-    VideoPlayerController newController = VideoPlayerController.networkUrl(Uri.parse(url));
-    await newController.initialize();
-    newController.addListener(_updateOverlayPosition);
+    // Create a separate media_kit player for the seek preview overlay
+    final newPlayer = Player();
+    final newVideoController = VideoController(newPlayer);
+    await newPlayer.open(Media(url), play: false);
 
-    _overlayController = newController;
+    // Wait for it to be ready
+    await newPlayer.stream.width.firstWhere((w) => w != null).timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => null,
+    );
+
+    _overlayPositionSub = newPlayer.stream.position.listen((pos) {
+      if (mounted) setState(() => _currentPosition = pos);
+    });
+
+    _overlayPlayer = newPlayer;
+    _overlayVideoController = newVideoController;
     _isOverlayInitialized = true;
 
     _overlayEntry = OverlayEntry(
       builder: (context) {
-        if (!_isOverlayInitialized) return const SizedBox();
+        if (!_isOverlayInitialized || _overlayVideoController == null) return const SizedBox();
 
         return ValueListenableBuilder<Offset?>(
           valueListenable: _overlayOffsetNotifier,
@@ -115,7 +133,10 @@ class _ReelSeekBarState extends State<ReelSeekBar> {
                       height: 170,
                       child: ClipRRect(
                         borderRadius: SmoothBorderRadius(cornerRadius: 10, cornerSmoothing: 1),
-                        child: VideoPlayer(_overlayController!),
+                        child: Video(
+                          controller: _overlayVideoController!,
+                          controls: NoVideoControls,
+                        ),
                       ),
                     ),
                     Container(
@@ -150,65 +171,60 @@ class _ReelSeekBarState extends State<ReelSeekBar> {
       },
     );
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-      Overlay.of(context).insert(_overlayEntry!);
+      if (_overlayEntry != null) {
+        Overlay.of(context).insert(_overlayEntry!);
+      }
     });
   }
 
   @override
   void dispose() {
     _removeOverlay();
-    _mainController?.removeListener(_updateMainPosition);
+    _positionSub?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final controller = _isOverlayInitialized ? _overlayController : _mainController;
+    if (widget.player == null) return const SizedBox(height: 15);
 
-    if (controller == null) return const SizedBox(height: 15);
+    final duration = _totalDuration.inMicroseconds.toDouble();
+    final position = _currentPosition.inMicroseconds.toDouble();
 
-    return ValueListenableBuilder<VideoPlayerValue>(
-      valueListenable: controller,
-      builder: (context, value, _) {
-        final duration = value.duration.inMicroseconds.toDouble();
-        final position = value.position.inMicroseconds.toDouble();
-
-        return SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            trackHeight: 2,
-            padding: EdgeInsets.zero,
-            overlayShape: const RoundSliderOverlayShape(overlayRadius: 0),
-            thumbShape: _InvisibleThumbShape(),
-            trackShape: const RectangularSliderTrackShape(),
-          ),
-          child: Listener(
-            onPointerMove: (event) => _updateOverlayLocation(event.position),
-            child: Slider(
-              key: sliderKey,
-              value: position.clamp(0, duration),
-              min: 0,
-              max: duration,
-              activeColor: textLightGrey(context),
-              inactiveColor: textDarkGrey(context),
-              onChangeStart: (value) {
-                if (duration <= 0) return;
-                _createOverlay();
-                _mainController?.pause();
-              },
-              onChangeEnd: (value) {
-                if (duration <= 0) return;
-                _removeOverlay();
-                _mainController?.play();
-                _mainController?.seekTo(Duration(microseconds: value.toInt()));
-              },
-              onChanged: (value) {
-                if (duration <= 0) return;
-                _overlayController?.seekTo(Duration(microseconds: value.toInt()));
-              },
-            ),
-          ),
-        );
-      },
+    return SliderTheme(
+      data: SliderTheme.of(context).copyWith(
+        trackHeight: 2,
+        padding: EdgeInsets.zero,
+        overlayShape: const RoundSliderOverlayShape(overlayRadius: 0),
+        thumbShape: _InvisibleThumbShape(),
+        trackShape: const RectangularSliderTrackShape(),
+      ),
+      child: Listener(
+        onPointerMove: (event) => _updateOverlayLocation(event.position),
+        child: Slider(
+          key: sliderKey,
+          value: position.clamp(0, duration),
+          min: 0,
+          max: duration > 0 ? duration : 1,
+          activeColor: textLightGrey(context),
+          inactiveColor: textDarkGrey(context),
+          onChangeStart: (value) {
+            if (duration <= 0) return;
+            _createOverlay();
+            widget.player?.pause();
+          },
+          onChangeEnd: (value) {
+            if (duration <= 0) return;
+            _removeOverlay();
+            widget.player?.play();
+            widget.player?.seek(Duration(microseconds: value.toInt()));
+          },
+          onChanged: (value) {
+            if (duration <= 0) return;
+            _overlayPlayer?.seek(Duration(microseconds: value.toInt()));
+          },
+        ),
+      ),
     );
   }
 }

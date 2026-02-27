@@ -70,15 +70,16 @@ class DashboardScreenController extends BaseController with GetSingleTickerProvi
     onProgress = (progress) {
       postProgress.value = progress;
     };
+
+    // Connect chat socket early so tab controllers can register their listeners
+    // before onReady() fires (which is post-first-frame)
+    ChatSocketService.instance.connect();
   }
 
   @override
   void onReady() async {
     super.onReady();
     SubscriptionManager.shared.subscriptionListener();
-
-    // Connect chat socket
-    ChatSocketService.instance.connect();
 
     // Run below in parallel
     _fetchLanguageFromUser();

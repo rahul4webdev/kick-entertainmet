@@ -44,20 +44,20 @@ class ChatThread {
   });
 
   ChatThread.fromJson(Map<String, dynamic> json) {
-    userId = json['user_id'];
-    id = json['id'];
-    msgCount = json['msg_count'];
-    chatType = ChatType.fromString(json['chat_type']);
+    userId = json['user_id'] is String ? int.tryParse(json['user_id']) : json['user_id'] as int?;
+    id = json['id']?.toString();
+    msgCount = json['msg_count'] is String ? int.tryParse(json['msg_count']) : json['msg_count'] as int?;
+    chatType = ChatType.fromString(json['chat_type'] ?? '');
     requestType = json['request_type'];
     lastMsg = json['last_msg'];
     conversationId = json['conversation_id'];
-    deletedId = json['deleted_id'];
-    isDeleted = json['is_deleted'];
-    iAmBlocked = json['i_am_blocked'];
-    iBlocked = json['i_blocked'];
-    isMuted = json['is_muted'] == true;
-    mutedUntil = json['muted_until'];
-    isArchived = json['is_archived'] == true;
+    deletedId = json['deleted_id'] is String ? int.tryParse(json['deleted_id']) : json['deleted_id'] as int?;
+    isDeleted = json['is_deleted'] == true || json['is_deleted'] == 1;
+    iAmBlocked = json['i_am_blocked'] == true || json['i_am_blocked'] == 1;
+    iBlocked = json['i_blocked'] == true || json['i_blocked'] == 1;
+    isMuted = json['is_muted'] == true || json['is_muted'] == 1;
+    mutedUntil = json['muted_until'] is String ? int.tryParse(json['muted_until']) : json['muted_until'] as int?;
+    isArchived = json['is_archived'] == true || json['is_archived'] == 1;
     type = json['type'] ?? 'direct';
     groupId = json['group_id'];
     if (json['group_data'] != null && json['group_data'] is Map) {
@@ -180,8 +180,8 @@ class GroupData {
     memberIds = json['member_ids'] != null
         ? List<int>.from(json['member_ids'])
         : null;
-    memberCount = json['member_count'];
-    createdBy = json['created_by'];
+    memberCount = json['member_count'] is String ? int.tryParse(json['member_count']) : json['member_count'] as int?;
+    createdBy = json['created_by'] is String ? int.tryParse(json['created_by']) : json['created_by'] as int?;
   }
 
   Map<String, dynamic> toJson() => {

@@ -5,9 +5,11 @@ class CartModel {
   String? message;
   List<CartItem>? data;
   int? totalCoins;
+  int? totalPaise;
+  double? totalRupees;
   int? itemCount;
 
-  CartModel({this.status, this.message, this.data, this.totalCoins, this.itemCount});
+  CartModel({this.status, this.message, this.data, this.totalCoins, this.totalPaise, this.totalRupees, this.itemCount});
 
   CartModel.fromJson(Map<String, dynamic> json) {
     status = json['status'];
@@ -19,6 +21,8 @@ class CartModel {
       });
     }
     totalCoins = json['total_coins'];
+    totalPaise = json['total_paise'];
+    totalRupees = (json['total_rupees'] as num?)?.toDouble();
     itemCount = json['item_count'];
   }
 }
@@ -27,16 +31,20 @@ class CartItem {
   int? id;
   int? userId;
   int? productId;
+  int? variantId;
   int? quantity;
   Product? product;
+  ProductVariant? variant;
   String? createdAt;
 
   CartItem({
     this.id,
     this.userId,
     this.productId,
+    this.variantId,
     this.quantity,
     this.product,
+    this.variant,
     this.createdAt,
   });
 
@@ -44,12 +52,21 @@ class CartItem {
     id = json['id'];
     userId = json['user_id'];
     productId = json['product_id'];
+    variantId = json['variant_id'];
     quantity = json['quantity'];
     product = json['product'] != null ? Product.fromJson(json['product']) : null;
+    variant = json['variant'] != null ? ProductVariant.fromJson(json['variant']) : null;
     createdAt = json['created_at'];
   }
 
   int get itemTotal => (product?.priceCoins ?? 0) * (quantity ?? 1);
+  int get itemTotalPaise {
+    if (variant != null && variant!.pricePaise != null && variant!.pricePaise! > 0) {
+      return variant!.pricePaise! * (quantity ?? 1);
+    }
+    return (product?.pricePaise ?? 0) * (quantity ?? 1);
+  }
+  double get itemTotalRupees => itemTotalPaise / 100.0;
 }
 
 class CartActionModel {

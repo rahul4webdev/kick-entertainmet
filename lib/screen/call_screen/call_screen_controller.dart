@@ -272,10 +272,37 @@ class CallScreenController extends BaseController {
 
   void _onCallEnded() {
     callState.value = CallState.ended;
+    _createCallLogMessage();
     _cleanup();
     Future.delayed(const Duration(milliseconds: 500), () {
       if (Get.isDialogOpen == true) Get.back();
       Get.back();
+    });
+  }
+
+  /// Creates a call log entry in the chat conversation (like WhatsApp/Instagram).
+  /// Only the outgoing caller creates the log to avoid duplicates.
+  void _createCallLogMessage() {
+    if (!isOutgoing) return; // Only caller creates the log
+
+    final recipientId = callData.recipientId;
+    if (recipientId == null || recipientId == 0) {
+      Loggers.warning('Cannot create call log: no recipientId');
+      return;
+    }
+
+    final callStatus = _durationSeconds > 0 ? 'completed' : 'missed';
+    final minutes = _durationSeconds ~/ 60;
+    final seconds = _durationSeconds % 60;
+    final duration = minutes > 0 ? '$minutes min' : '$seconds sec';
+
+    ChatSocketService.instance.emit(ChatEvents.cCreateCallLog, {
+      'recipient_id': recipientId,
+      'call_id': callData.callId,
+      'call_type': callData.isVideoCall ? 'video' : 'voice',
+      'call_status': callStatus,
+      'call_duration': duration,
+      'duration_seconds': _durationSeconds,
     });
   }
 

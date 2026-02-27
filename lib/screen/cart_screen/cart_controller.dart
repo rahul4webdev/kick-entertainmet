@@ -105,6 +105,19 @@ class CartController extends BaseController {
     totalCoins.value = total;
   }
 
+  bool get hasInrItems =>
+      cartItems.any((item) =>
+          (item.product?.pricePaise != null && item.product!.pricePaise! > 0) ||
+          (item.variant?.pricePaise != null && item.variant!.pricePaise! > 0));
+
+  double get totalRupees {
+    double total = 0;
+    for (final item in cartItems) {
+      total += item.itemTotalRupees;
+    }
+    return total;
+  }
+
   // Addresses
   Future<void> fetchAddresses() async {
     isLoadingAddresses.value = true;

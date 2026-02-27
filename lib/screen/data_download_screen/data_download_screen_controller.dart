@@ -14,17 +14,23 @@ class DataDownloadScreenController extends BaseController {
 
   Future<void> _loadRequests() async {
     isDataLoading.value = true;
-    requests.value = await UserService.instance.fetchDataDownloadRequests();
+    try {
+      requests.value = await UserService.instance.fetchDataDownloadRequests();
+    } catch (_) {}
     isDataLoading.value = false;
   }
 
   Future<void> requestDownload() async {
     showLoader();
-    final result = await UserService.instance.requestDataDownload();
-    stopLoader();
-    showSnackBar(result.message);
-    if (result.status == true) {
-      await _loadRequests();
+    try {
+      final result = await UserService.instance.requestDataDownload();
+      stopLoader();
+      showSnackBar(result.message);
+      if (result.status == true) {
+        await _loadRequests();
+      }
+    } catch (_) {
+      stopLoader();
     }
   }
 

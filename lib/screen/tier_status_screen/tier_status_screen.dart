@@ -26,11 +26,19 @@ class _TierStatusScreenState extends State<TierStatusScreen> {
   }
 
   Future<void> _loadData() async {
-    final result = await GiftWalletService.instance.fetchMyTierStatus();
-    setState(() {
-      data = result;
-      isLoading = false;
-    });
+    try {
+      final result = await GiftWalletService.instance.fetchMyTierStatus();
+      if (mounted) {
+        setState(() {
+          data = result;
+          isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
+    }
   }
 
   Color _tierColor(int? level) {

@@ -27,6 +27,7 @@ class EditProfileScreenController extends BaseController {
   Map<String, bool> usernameCache = {}; // Cache for username availability
   Timer? _debounce;
   RxBool isValidUserName = true.obs;
+  RxString usernameStatus = ''.obs;
   TextEditingController fullNameController = TextEditingController();
   TextEditingController usernameController = TextEditingController();
   TextEditingController bioController = TextEditingController();
@@ -61,8 +62,10 @@ class EditProfileScreenController extends BaseController {
     bioController = TextEditingController(text: userData.value?.bio ?? '');
     pronounsController =
         TextEditingController(text: userData.value?.pronouns ?? '');
-    emailController =
-        TextEditingController(text: userData.value?.userEmail ?? '');
+    emailController = TextEditingController(
+        text: userData.value?.userEmail ??
+            userData.value?.identity ??
+            '');
     phoneNumberController =
         TextEditingController(text: userData.value?.userMobileNo);
     links.value = userData.value?.links ?? [];
@@ -126,17 +129,18 @@ class EditProfileScreenController extends BaseController {
   }
 
   void checkUsernameAvailability(String value) {
-    final username = value.trim(); // Use passed value and trim it once
+    final username = value.trim();
 
-    // Validate for spaces
     if (username.contains(' ')) {
       isValidUserName.value = false;
+      usernameStatus.value = 'invalid';
       return;
     }
 
     // Check cache first
     if (usernameCache.containsKey(username)) {
       isValidUserName.value = usernameCache[username]!;
+      usernameStatus.value = usernameCache[username]! ? 'available' : 'taken';
       return;
     }
 
@@ -145,22 +149,25 @@ class EditProfileScreenController extends BaseController {
     if (username.isNotEmpty &&
         currentUser?.toLowerCase() == username.toLowerCase()) {
       isValidUserName.value = true;
-      usernameCache[username] = true; // Cache the result
+      usernameCache[username] = true;
+      usernameStatus.value = '';
       return;
     }
     if (!GetUtils.isUsername(username)) {
       isValidUserName.value = true;
+      usernameStatus.value = '';
       return;
     }
 
-    // Handle debounce
+    usernameStatus.value = 'checking';
     if (_debounce?.isActive ?? false) _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 500), () async {
       final model = await UserService.instance
           .checkUsernameAvailability(userName: username);
       final isAvailable = model.status ?? true;
       isValidUserName.value = isAvailable;
-      usernameCache[username] = isAvailable; // Cache the result
+      usernameCache[username] = isAvailable;
+      usernameStatus.value = isAvailable ? 'available' : 'taken';
     });
   }
 
